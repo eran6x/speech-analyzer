@@ -15,10 +15,11 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
-from . import coaching, db
+from . import coaching, db, stats
 from .acoustic import compute_metrics
-from .models import Session, Topic
+from .models import Session, Stats, Topic
 from .scoring import compute_scores
 from .topics import CATEGORIES, suggest_topic
 from .transcription import transcribe
@@ -81,7 +82,7 @@ async def analyze(
     except Exception as exc:  # surface a clean error rather than a 500 stack
         raise HTTPException(status_code=500, detail=f"Transcription failed: {exc}")
 
-    metrics = compute_metrics(transcription, str(audio_path))
+    metrics, annotations = compute_metrics(transcription, str(audio_path))
     scores = compute_scores(metrics, transcription.duration_sec)
 
     topic = Topic(category=topic_category, prompt=topic_prompt)
@@ -100,9 +101,28 @@ async def analyze(
         scores=scores,
         feedback=feedback,
         audio_path=str(audio_path),
+        annotations=annotations,
     )
     db.save_session(session)
     return session
+
+
+@app.get("/stats", response_model=Stats)
+def get_stats() -> Stats:
+    return stats.compute_stats(db.list_sessions())
+
+
+@app.get("/sessions/{session_id}/audio")
+def get_audio(session_id: str) -> FileResponse:
+    session = db.get_session(session_id)
+    if session is None or not session.audio_path:
+        raise HTTPException(status_code=404, detail="Audio not found")
+    path = Path(session.audio_path).resolve()
+    # Only ever serve files from within the recordings directory.
+    recordings_root = RECORDINGS_DIR.resolve()
+    if recordings_root not in path.parents or not path.exists():
+        raise HTTPException(status_code=404, detail="Audio not found")
+    return FileResponse(path)
 
 
 @app.get("/sessions", response_model=list[Session])

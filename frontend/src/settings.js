@@ -8,6 +8,8 @@ export const DEFAULTS = {
   keepRecordings: true,
   coachingEnabled: true,
   targetPaceWpm: 145,
+  goalOverall: 80, // target average overall score
+  goalWeekly: 3, // target sessions per week
 };
 
 export function loadSettings() {

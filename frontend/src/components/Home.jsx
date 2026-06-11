@@ -1,4 +1,5 @@
 import Trends from "./Trends.jsx";
+import StreakGoals from "./StreakGoals.jsx";
 import { loadSettings } from "../settings.js";
 
 export default function Home({ onStart }) {
@@ -24,6 +25,9 @@ export default function Home({ onStart }) {
           Start practicing →
         </button>
       </div>
+
+      <h3 className="section-title">Streak &amp; goals</h3>
+      <StreakGoals />
 
       <h3 className="section-title">Your progress</h3>
       <Trends />

@@ -249,6 +249,30 @@ header h1 {
   margin-bottom: 0.75rem;
 }
 
+/* Waveform playback */
+.waveform-canvas {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
+.waveform-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.waveform-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
 /* Home */
 .home-hero h2 {
   margin: 0 0 0.5rem;
@@ -265,6 +289,77 @@ header h1 {
 
 .home-hero .primary-btn {
   margin-top: 0.75rem;
+}
+
+/* Streak & goals */
+.streak-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+
+.streak-stat {
+  text-align: center;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 0.75rem 0.25rem;
+}
+
+.streak-stat.big {
+  background: rgba(110, 168, 254, 0.12);
+}
+
+.streak-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.streak-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.goals-title {
+  margin: 1.25rem 0 0.5rem;
+}
+
+.goal {
+  margin-bottom: 0.9rem;
+}
+
+.goal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  margin-bottom: 0.35rem;
+}
+
+.goal-target {
+  color: var(--muted);
+}
+
+.goal-target input {
+  width: 3.2rem;
+  background: var(--bg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  color: var(--text);
+  padding: 0.15rem 0.35rem;
+  font-size: 0.85rem;
+}
+
+.goal-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.goal-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
 }
 
 /* Help */

@@ -28,7 +28,7 @@ A browser tool that:
 | Audio capture | MediaRecorder + Web Audio API |
 | Backend | **Python + FastAPI** |
 | Speech-to-text | **faster-whisper** (word-level timestamps required) |
-| Acoustic analysis | **parselmouth** (Praat) + **librosa** |
+| Acoustic analysis | **parselmouth** (Praat) — covers pitch/intensity/pauses/jitter/shimmer/HNR through Phase 3; **librosa** not yet needed (audio decoding is handled by **av**) |
 | Coaching layer | Anthropic Messages API (current Claude model) |
 | Storage | **SQLite** (single file; migrate to Postgres only if ever needed) |
 

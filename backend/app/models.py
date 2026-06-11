@@ -50,6 +50,15 @@ class Scores(BaseModel):
     overall: Optional[int] = Field(None, ge=1, le=100)
 
 
+class Annotation(BaseModel):
+    """A time span in the recording worth marking on playback."""
+
+    kind: str  # pause | filler | hedge | upspeak
+    label: str
+    start: float
+    end: float
+
+
 class Session(BaseModel):
     id: str
     timestamp: str
@@ -60,3 +69,21 @@ class Session(BaseModel):
     scores: Scores
     feedback: Optional[str] = None
     audio_path: Optional[str] = None
+    # Optional so sessions saved before Phase 3 still load.
+    annotations: Optional[list[Annotation]] = None
+
+
+class Averages(BaseModel):
+    overall: Optional[float] = None
+    pace: Optional[float] = None
+    pauses: Optional[float] = None
+    confidence: Optional[float] = None
+    fluency: Optional[float] = None
+
+
+class Stats(BaseModel):
+    total_sessions: int
+    current_streak: int
+    longest_streak: int
+    sessions_this_week: int
+    averages: Averages

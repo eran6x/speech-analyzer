@@ -11,6 +11,15 @@ annotated playback, and exportable reports. It also wires up the future-proofed
 > only. Keep the scoring config in one place, type everything with pydantic,
 > stay on local SQLite, and keep secrets in `.env`.
 
+## Status
+
+- ✅ **Done this round:** Feature 2 (Streaks & goals) and Feature 3 (Annotated
+  waveform playback).
+- ⏭️ **Deferred to Phase 5** ([Phase5_plan.md](Phase5_plan.md)): Feature 1
+  (Session compare), Feature 4 (Exportable report), Feature 5 (Wire Settings
+  into the pipeline).
+- Licensing/distribution lives in [Phase4_plan.md](Phase4_plan.md).
+
 ---
 
 ## Goals

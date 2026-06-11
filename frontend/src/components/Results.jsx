@@ -1,4 +1,5 @@
 import { DIMENSION_COLORS, METRIC_DIMENSION } from "../colors.js";
+import WaveformPlayer from "./WaveformPlayer.jsx";
 
 export default function Results({ session }) {
   if (!session) return null;
@@ -23,6 +24,13 @@ export default function Results({ session }) {
           <h3>Coaching</h3>
           <p className="feedback-text">{feedback}</p>
         </div>
+      )}
+
+      {session.id && (
+        <details className="collapsible" open>
+          <summary>Playback</summary>
+          <WaveformPlayer session={session} />
+        </details>
       )}
 
       <details className="collapsible" open>

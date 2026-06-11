@@ -23,14 +23,23 @@ Every session is saved to SQLite.
 - **Tailored topics** — "✨ tailor to weak areas" asks Claude for a topic
   targeting your weakest recent dimension; random fallback without a key.
 
-**App shell (current):** five tabs — **Home** (greeting + progress chart),
-**Practice** (scenario buttons + recording, collapsible stats/transcript),
-**Trends**, **Help** (what every score/metric means), and **Settings**
-(account/privacy/security/general — stored locally, future-proofed).
+**App shell:** five tabs — **Home** (greeting + streak/goals + progress chart),
+**Practice** (scenario buttons + recording, collapsible playback/stats/
+transcript), **Trends**, **Help** (what every score/metric means), and
+**Settings** (account/privacy/security/general — stored locally, future-proofed).
 
-Phase 3 (compare sessions, streaks/goals, annotated waveform playback,
-exportable report, and wiring Settings into the pipeline) is planned in
-[Phase3_plan.md](Phase3_plan.md).
+**Phase 3 (this round):**
+- **Daily streaks & goals** on Home — current/longest streak, sessions this
+  week, and editable targets (avg overall score, sessions/week) with progress
+  bars (`GET /stats`).
+- **Annotated waveform playback** — play your recording back with colored
+  markers for pauses, fillers, hedges, and upspeak; click a marker to jump
+  there (WaveSurfer.js + `GET /sessions/{id}/audio`). Statistics colors match
+  the trend-line colors for pace/pauses/confidence/fluency.
+
+Deferred: session compare, exportable report, and wiring Settings into the
+pipeline → [Phase5_plan.md](Phase5_plan.md). Licensing (AGPLv3 + commercial
+use) → [Phase4_plan.md](Phase4_plan.md). Phase 3 designs → [Phase3_plan.md](Phase3_plan.md).
 
 The scoring config (ideal ranges + weights) lives in one place:
 [backend/app/scoring.py](backend/app/scoring.py) → `CONFIG`.
@@ -67,6 +76,11 @@ python3.11 -m venv ../.venv          # use a 3.11/3.12 interpreter
 ```
 
 The first `/analyze` call downloads the whisper `base` model (~140 MB) once.
+
+All Python dependencies are pinned in [backend/requirements.txt](backend/requirements.txt)
+(FastAPI/uvicorn, pydantic, faster-whisper, av, numpy, praat-parselmouth,
+anthropic, requests). Note: `librosa` from the original tech stack isn't
+required — parselmouth covers the acoustic analysis through Phase 3.
 
 - API docs: http://localhost:8000/docs
 - SQLite file `backend/speech_analyzer.db` and raw clips in

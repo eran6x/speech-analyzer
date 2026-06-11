@@ -18,9 +18,11 @@ import parselmouth
 from parselmouth.praat import call
 
 from .audio_io import load_waveform
-from .models import Metrics
-from .text_metrics import analyze_text
+from .models import Annotation, Metrics
+from .text_metrics import analyze_text, locate_spans
 from .transcription import Transcription, Word
+
+Span = tuple[float, float]
 
 # A silent stretch longer than this counts as a pause.
 PAUSE_THRESHOLD_SEC = 0.25
@@ -48,10 +50,12 @@ class _Acoustic:
     pause_count: int
     mean_pause_sec: float
     total_pause_sec: float
+    pause_spans: list[Span]
     jitter: float | None
     shimmer: float | None
     hnr: float | None
     upspeak_count: int
+    upspeak_spans: list[Span]
 
 
 def _voice_quality(sound: parselmouth.Sound) -> tuple[float | None, float | None, float | None]:
@@ -93,18 +97,18 @@ def _f0_slope(pitch: parselmouth.Pitch, t0: float, t1: float) -> float | None:
     return float(slope)
 
 
-def _compute_upspeak(pitch: parselmouth.Pitch, words: list[Word], text: str) -> int:
-    """Count declarative sentences whose final segment rises in pitch.
+def _compute_upspeak(pitch: parselmouth.Pitch, words: list[Word], text: str) -> list[Span]:
+    """Spans of declarative sentences whose final segment rises in pitch.
 
     Sentences are split on terminal punctuation and aligned to word timestamps
     by token count (words are already in order). Questions are excluded — a
     rising ending there is expected, not upspeak.
     """
     if not words:
-        return 0
+        return []
     sentences = [s for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
     idx = 0
-    upspeak = 0
+    spans: list[Span] = []
     for sentence in sentences:
         tokens = re.findall(r"[a-z']+", sentence.lower())
         n = len(tokens)
@@ -116,8 +120,8 @@ def _compute_upspeak(pitch: parselmouth.Pitch, words: list[Word], text: str) -> 
         final_start = max(seg[0].start, end - UPSPEAK_FINAL_SEGMENT_SEC)
         slope = _f0_slope(pitch, final_start, end)
         if slope is not None and slope > UPSPEAK_SLOPE_HZ_PER_SEC:
-            upspeak += 1
-    return upspeak
+            spans.append((final_start, end))
+    return spans
 
 
 def _acoustic_features(audio_path: str, transcription: Transcription) -> _Acoustic:
@@ -139,9 +143,10 @@ def _acoustic_features(audio_path: str, transcription: Transcription) -> _Acoust
     values = np.asarray(intensity.values[0], dtype=float)
     values = values[np.isfinite(values)]
     dt = float(intensity.dx)
+    t0 = float(intensity.x1)  # time of the first intensity frame
 
     # --- Pauses: runs of frames below a silence threshold relative to peak ---
-    pause_count, total_pause = _detect_pauses(values, dt)
+    pause_count, total_pause, pause_spans = _detect_pauses(values, dt, t0)
     mean_pause = (total_pause / pause_count) if pause_count else 0.0
 
     # Volume stats over *sounding* frames only, so silent pauses don't masquerade
@@ -151,7 +156,7 @@ def _acoustic_features(audio_path: str, transcription: Transcription) -> _Acoust
     volume_std = float(sounding.std()) if sounding.size > 1 else 0.0
 
     jitter, shimmer, hnr = _voice_quality(sound)
-    upspeak = _compute_upspeak(pitch, transcription.words, transcription.text)
+    upspeak_spans = _compute_upspeak(pitch, transcription.words, transcription.text)
 
     return _Acoustic(
         duration_sec=float(sound.get_total_duration()),
@@ -162,38 +167,44 @@ def _acoustic_features(audio_path: str, transcription: Transcription) -> _Acoust
         pause_count=pause_count,
         mean_pause_sec=round(mean_pause, 2),
         total_pause_sec=total_pause,
+        pause_spans=pause_spans,
         jitter=jitter,
         shimmer=shimmer,
         hnr=hnr,
-        upspeak_count=upspeak,
+        upspeak_count=len(upspeak_spans),
+        upspeak_spans=upspeak_spans,
     )
 
 
-def _detect_pauses(intensity_db: np.ndarray, dt: float) -> tuple[int, float]:
-    """Count silent runs longer than PAUSE_THRESHOLD_SEC; return (count, total_sec)."""
+def _detect_pauses(intensity_db: np.ndarray, dt: float, t0: float) -> tuple[int, float, list[Span]]:
+    """Find silent runs longer than PAUSE_THRESHOLD_SEC.
+
+    Returns (count, total_sec, spans) where each span is (start, end) in seconds.
+    """
     if intensity_db.size == 0 or dt <= 0:
-        return 0, 0.0
+        return 0, 0.0, []
 
     threshold = intensity_db.max() - SILENCE_DROP_DB
     silent = intensity_db < threshold
     min_frames = max(1, int(round(PAUSE_THRESHOLD_SEC / dt)))
 
-    pause_count = 0
     total_pause_sec = 0.0
+    spans: list[Span] = []
     run = 0
-    for is_silent in silent:
+    n = len(silent)
+    for i in range(n + 1):
+        is_silent = bool(silent[i]) if i < n else False
         if is_silent:
             run += 1
         else:
             if run >= min_frames:
-                pause_count += 1
+                start = t0 + (i - run) * dt
+                end = t0 + i * dt
+                spans.append((round(start, 2), round(end, 2)))
                 total_pause_sec += run * dt
             run = 0
-    if run >= min_frames:  # trailing silence
-        pause_count += 1
-        total_pause_sec += run * dt
 
-    return pause_count, round(total_pause_sec, 2)
+    return len(spans), round(total_pause_sec, 2), spans
 
 
 def _word_gap_pauses(transcription: Transcription) -> int:
@@ -204,13 +215,24 @@ def _word_gap_pauses(transcription: Transcription) -> int:
     )
 
 
-def compute_metrics(transcription: Transcription, audio_path: str) -> Metrics:
+def _word_annotations(transcription: Transcription) -> list[Annotation]:
+    """Filler and hedge spans from the transcript's word timestamps."""
+    filler_spans, hedge_spans = locate_spans(transcription.words)
+    out = [Annotation(kind="filler", label=lbl, start=round(s, 2), end=round(e, 2)) for lbl, s, e in filler_spans]
+    out += [Annotation(kind="hedge", label=lbl, start=round(s, 2), end=round(e, 2)) for lbl, s, e in hedge_spans]
+    return out
+
+
+def compute_metrics(
+    transcription: Transcription, audio_path: str
+) -> tuple[Metrics, list[Annotation]]:
     words = transcription.words
     word_count = len(words)
     duration = transcription.duration_sec
     wpm = (word_count / duration * 60.0) if duration > 0 else 0.0
 
     text = analyze_text(transcription.text)
+    annotations = _word_annotations(transcription)
 
     try:
         ac = _acoustic_features(audio_path, transcription)
@@ -220,7 +242,15 @@ def compute_metrics(transcription: Transcription, audio_path: str) -> Metrics:
     if ac is not None:
         speaking_sec = max(ac.duration_sec - ac.total_pause_sec, 1e-6)
         articulation = word_count / speaking_sec * 60.0
-        return Metrics(
+        annotations += [
+            Annotation(kind="pause", label="pause", start=s, end=e) for s, e in ac.pause_spans
+        ]
+        annotations += [
+            Annotation(kind="upspeak", label="upspeak", start=round(s, 2), end=round(e, 2))
+            for s, e in ac.upspeak_spans
+        ]
+        annotations.sort(key=lambda a: a.start)
+        metrics = Metrics(
             wpm=round(wpm, 1),
             articulation_rate=round(articulation, 1),
             mean_pitch_hz=ac.mean_pitch_hz,
@@ -238,9 +268,11 @@ def compute_metrics(transcription: Transcription, audio_path: str) -> Metrics:
             shimmer=ac.shimmer,
             hnr=ac.hnr,
         )
+        return metrics, annotations
 
     # Fallback: no acoustic features, pauses from word-timestamp gaps.
-    return Metrics(
+    annotations.sort(key=lambda a: a.start)
+    metrics = Metrics(
         wpm=round(wpm, 1),
         pause_count=_word_gap_pauses(transcription),
         filler_count=text.filler_count,
@@ -248,3 +280,4 @@ def compute_metrics(transcription: Transcription, audio_path: str) -> Metrics:
         hedge_count=text.hedge_count,
         false_start_count=text.false_start_count,
     )
+    return metrics, annotations

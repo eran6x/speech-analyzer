@@ -23,6 +23,16 @@ export async function fetchSessions() {
   return res.json();
 }
 
+export async function fetchStats() {
+  const res = await fetch(`${API_BASE}/stats`);
+  if (!res.ok) throw new Error(`Failed to fetch stats (${res.status})`);
+  return res.json();
+}
+
+export function audioUrl(sessionId) {
+  return `${API_BASE}/sessions/${sessionId}/audio`;
+}
+
 export async function analyze(audioBlob, topic) {
   const form = new FormData();
   form.append("audio", audioBlob, "recording.webm");

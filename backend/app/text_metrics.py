@@ -44,6 +44,32 @@ def _tokens(text: str) -> list[str]:
     return re.findall(r"[a-z']+", text.lower())
 
 
+def _norm(token: str) -> str:
+    return re.sub(r"[^a-z']", "", token.lower())
+
+
+def locate_spans(words) -> tuple[list[tuple[str, float, float]], list[tuple[str, float, float]]]:
+    """Map fillers and hedges to (label, start, end) spans using word timestamps.
+
+    `words` are transcription.Word objects (text/start/end), already in order.
+    Returns (filler_spans, hedge_spans).
+    """
+    norm = [(_norm(w.text), w) for w in words]
+    tokens = [t for t, _ in norm]
+
+    filler_spans = [(t, w.start, w.end) for t, w in norm if t in FILLERS]
+
+    hedge_spans: list[tuple[str, float, float]] = []
+    for phrase in HEDGES:
+        parts = phrase.split()
+        length = len(parts)
+        for i in range(len(tokens) - length + 1):
+            if tokens[i : i + length] == parts:
+                hedge_spans.append((phrase, norm[i][1].start, norm[i + length - 1][1].end))
+
+    return filler_spans, hedge_spans
+
+
 def analyze_text(transcript: str) -> TextMetrics:
     tokens = _tokens(transcript)
     word_count = len(tokens)
