@@ -1,0 +1,10 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pydantic==2.10.4
+faster-whisper==1.1.1
+# faster-whisper 1.1.1 imports `requests` directly, but recent huggingface_hub
+# no longer pulls it in — declare it explicitly.
+requests==2.32.3
+praat-parselmouth==0.4.6
+anthropic==0.69.0

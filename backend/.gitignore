@@ -1,0 +1,5 @@
+.env
+*.db
+recordings/
+__pycache__/
+*.pyc
