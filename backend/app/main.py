@@ -20,7 +20,7 @@ from . import coaching, db
 from .acoustic import compute_metrics
 from .models import Session, Topic
 from .scoring import compute_scores
-from .topics import suggest_topic
+from .topics import CATEGORIES, suggest_topic
 from .transcription import transcribe
 
 RECORDINGS_DIR = Path(
@@ -47,15 +47,20 @@ def _startup() -> None:
     RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
 
 
+@app.get("/categories", response_model=list[str])
+def get_categories() -> list[str]:
+    return CATEGORIES
+
+
 @app.get("/topic", response_model=Topic)
-def get_topic(tailored: bool = False) -> Topic:
+def get_topic(tailored: bool = False, category: str | None = None) -> Topic:
     # When requested, ask the coaching layer for a topic targeting the user's
     # weakest recent dimension; fall back to a random pick if unavailable.
     if tailored:
         topic = coaching.generate_topic(db.list_sessions())
         if topic is not None:
             return topic
-    return suggest_topic()
+    return suggest_topic(category)
 
 
 @app.post("/analyze", response_model=Session)

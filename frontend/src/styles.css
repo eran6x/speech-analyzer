@@ -192,6 +192,195 @@ header h1 {
   color: var(--muted);
 }
 
+.section-title {
+  margin: 1.5rem 0 0;
+}
+
+/* Practice — scenario picker */
+.scenarios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.scenario {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.scenario.active {
+  background: var(--accent);
+  color: #0f1117;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.scenario.tailor {
+  text-transform: none;
+}
+
+.scenario:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Collapsible Statistics / Transcript */
+.collapsible {
+  margin-top: 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 0.75rem;
+}
+
+.collapsible > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1.05rem;
+  list-style: revert;
+}
+
+.collapsible[open] > summary {
+  margin-bottom: 0.75rem;
+}
+
+/* Home */
+.home-hero h2 {
+  margin: 0 0 0.5rem;
+}
+
+.home-hero p {
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.home-howto {
+  color: var(--muted);
+}
+
+.home-hero .primary-btn {
+  margin-top: 0.75rem;
+}
+
+/* Help */
+.help-intro,
+.help-note {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.help-list {
+  margin: 0.5rem 0 1.25rem;
+}
+
+.help-item {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.help-item dt {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.help-item dd {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+/* Settings */
+.settings-section {
+  padding-bottom: 0.5rem;
+}
+
+.settings-section h3 {
+  margin-top: 0;
+}
+
+.settings-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.settings-field label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.95rem;
+}
+
+.settings-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.settings-field input[type="text"],
+.settings-field input[type="email"],
+.settings-field input[type="number"] {
+  background: var(--bg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 0.4rem 0.6rem;
+  min-width: 12rem;
+}
+
+.settings-field input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ghost-btn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+}
+
+.ghost-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.soon {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+
+.settings-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin-top: 1rem;
+}
+
 .subscore-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -202,14 +391,13 @@ header h1 {
 .subscore {
   text-align: center;
   padding: 0.6rem 0.25rem;
-  background: rgba(110, 168, 254, 0.1);
+  background: rgba(255, 255, 255, 0.04);
   border-radius: 8px;
 }
 
 .subscore-value {
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--accent);
 }
 
 .subscore-label {
@@ -247,9 +435,36 @@ header h1 {
   text-align: center;
 }
 
+.metric {
+  text-align: left;
+}
+
 .metric-value {
   font-size: 1.4rem;
   font-weight: 600;
+}
+
+.dim-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin-top: 0.9rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.dim-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.dim-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
 }
 
 .metric-label {

@@ -10,14 +10,11 @@ import {
   YAxis,
 } from "recharts";
 import { fetchSessions } from "../api.js";
+import { DIMENSION_COLORS } from "../colors.js";
 
-const SERIES = [
-  { key: "overall", color: "#6ea8fe" },
-  { key: "pace", color: "#63e6be" },
-  { key: "pauses", color: "#ffd43b" },
-  { key: "confidence", color: "#ff8787" },
-  { key: "fluency", color: "#da77f2" },
-];
+const SERIES = ["overall", "pace", "pauses", "confidence", "fluency"].map(
+  (key) => ({ key, color: DIMENSION_COLORS[key] })
+);
 
 export default function Trends() {
   const [sessions, setSessions] = useState(null);

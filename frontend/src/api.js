@@ -1,10 +1,19 @@
 // Backend calls. The base URL can be overridden with VITE_API_BASE.
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
-export async function fetchTopic(tailored = false) {
-  const url = tailored ? `${API_BASE}/topic?tailored=true` : `${API_BASE}/topic`;
-  const res = await fetch(url);
+export async function fetchTopic({ tailored = false, category = null } = {}) {
+  const params = new URLSearchParams();
+  if (tailored) params.set("tailored", "true");
+  if (category) params.set("category", category);
+  const qs = params.toString();
+  const res = await fetch(`${API_BASE}/topic${qs ? `?${qs}` : ""}`);
   if (!res.ok) throw new Error(`Failed to fetch topic (${res.status})`);
+  return res.json();
+}
+
+export async function fetchCategories() {
+  const res = await fetch(`${API_BASE}/categories`);
+  if (!res.ok) throw new Error(`Failed to fetch categories (${res.status})`);
   return res.json();
 }
 

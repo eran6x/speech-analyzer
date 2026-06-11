@@ -7,6 +7,7 @@ the user's weakest dimension (see roadmap Phase 2).
 from __future__ import annotations
 
 import random
+from typing import Optional
 
 from .models import Topic
 
@@ -34,6 +35,13 @@ TOPICS: list[Topic] = [
 ]
 
 
-def suggest_topic() -> Topic:
-    """Return a random topic from the library."""
+CATEGORIES = [t.category for t in TOPICS]
+
+
+def suggest_topic(category: Optional[str] = None) -> Topic:
+    """Return a random topic, optionally restricted to a single category."""
+    if category:
+        matches = [t for t in TOPICS if t.category == category]
+        if matches:
+            return random.choice(matches)
     return random.choice(TOPICS)

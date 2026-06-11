@@ -16,19 +16,21 @@ A personal web app for analyzing spoken delivery. See
 
 Every session is saved to SQLite.
 
-**Phase 2 (in progress):**
-- **Trends** tab — line charts of overall + per-dimension scores across all
-  saved sessions (Recharts).
+**Phase 2 (complete):**
+- **Trends** tab — line charts of overall + per-dimension scores (Recharts).
 - **Voice-quality metrics** — jitter, shimmer, HNR (parselmouth).
-- **Upspeak** detection — rising F0 on declarative sentence endings, which
-  feeds into the confidence score.
-- **New test** button to clear the result and pull a fresh topic.
-- **Tailored topics** — the "✨ tailor to weak areas" button asks Claude for a
-  practice topic targeting your weakest recent dimension (`GET /topic?tailored=true`);
-  falls back to a random topic without an API key or scored history.
+- **Upspeak** detection — rising F0 on declarative endings, feeds confidence.
+- **Tailored topics** — "✨ tailor to weak areas" asks Claude for a topic
+  targeting your weakest recent dimension; random fallback without a key.
 
-Phase 2 is complete. Phase 3 (compare sessions, streaks, annotated waveform,
-exportable report) is the next milestone.
+**App shell (current):** five tabs — **Home** (greeting + progress chart),
+**Practice** (scenario buttons + recording, collapsible stats/transcript),
+**Trends**, **Help** (what every score/metric means), and **Settings**
+(account/privacy/security/general — stored locally, future-proofed).
+
+Phase 3 (compare sessions, streaks/goals, annotated waveform playback,
+exportable report, and wiring Settings into the pipeline) is planned in
+[Phase3_plan.md](Phase3_plan.md).
 
 The scoring config (ideal ranges + weights) lives in one place:
 [backend/app/scoring.py](backend/app/scoring.py) → `CONFIG`.
@@ -38,6 +40,22 @@ The scoring config (ideal ranges + weights) lives in one place:
 - **Python 3.11 or 3.12** for the backend. (3.13+ is not yet supported by
   faster-whisper's native dependency `ctranslate2` / `pydantic-core`.)
 - **Node 18+** for the frontend.
+
+## Quick start (both at once)
+
+Once the venv exists and `npm install` has run (see below), start/stop both
+servers together:
+
+```bash
+./dev.sh start     # backend :8000 + frontend :5173 (loads backend/.env)
+./dev.sh status
+./dev.sh logs      # tail both logs
+./dev.sh stop
+./dev.sh restart
+```
+
+Logs and PIDs live in `.dev/` (git-ignored). The sections below cover first-time
+setup and running each server manually.
 
 ## Backend
 
