@@ -26,7 +26,7 @@ export default function Results({ session }) {
         </div>
       )}
 
-      {session.id && (
+      {session.id && session.audio_path && (
         <details className="collapsible" open>
           <summary>Playback</summary>
           <WaveformPlayer session={session} />

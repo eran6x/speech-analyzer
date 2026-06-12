@@ -55,6 +55,13 @@ def list_sessions() -> list[Session]:
     return [Session.model_validate(json.loads(r["data"])) for r in rows]
 
 
+def delete_all_sessions() -> int:
+    """Delete every session row. Returns the number removed."""
+    with _connect() as conn:
+        cur = conn.execute("DELETE FROM sessions")
+        return cur.rowcount
+
+
 def get_session(session_id: str) -> Session | None:
     with _connect() as conn:
         row = conn.execute(

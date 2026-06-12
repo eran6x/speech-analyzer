@@ -33,11 +33,13 @@ export function audioUrl(sessionId) {
   return `${API_BASE}/sessions/${sessionId}/audio`;
 }
 
-export async function analyze(audioBlob, topic) {
+export async function analyze(audioBlob, topic, opts = {}) {
   const form = new FormData();
   form.append("audio", audioBlob, "recording.webm");
   form.append("topic_category", topic.category);
   form.append("topic_prompt", topic.prompt);
+  form.append("enable_coaching", opts.coaching === false ? "false" : "true");
+  form.append("keep_recording", opts.keepRecording === false ? "false" : "true");
 
   const res = await fetch(`${API_BASE}/analyze`, {
     method: "POST",
@@ -47,5 +49,11 @@ export async function analyze(audioBlob, topic) {
     const detail = await res.text();
     throw new Error(`Analysis failed (${res.status}): ${detail}`);
   }
+  return res.json();
+}
+
+export async function deleteAllSessions() {
+  const res = await fetch(`${API_BASE}/sessions`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`Failed to delete sessions (${res.status})`);
   return res.json();
 }

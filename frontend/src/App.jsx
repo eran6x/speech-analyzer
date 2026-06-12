@@ -8,6 +8,7 @@ import Home from "./components/Home.jsx";
 import Help from "./components/Help.jsx";
 import Settings from "./components/Settings.jsx";
 import { analyze, fetchCategories, fetchTopic } from "./api.js";
+import { loadSettings } from "./settings.js";
 
 const TABS = ["Home", "Practice", "Trends", "Help", "Settings"];
 
@@ -55,7 +56,13 @@ export default function App() {
     setError(null);
     setSession(null);
     try {
-      setSession(await analyze(blob, topic));
+      const s = loadSettings();
+      setSession(
+        await analyze(blob, topic, {
+          coaching: s.coachingEnabled,
+          keepRecording: s.keepRecordings,
+        })
+      );
       setStatus("idle");
     } catch (err) {
       setError(err.message);

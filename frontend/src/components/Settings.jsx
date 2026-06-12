@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { deleteAllSessions } from "../api.js";
 import { loadSettings, saveSettings } from "../settings.js";
 
 export default function Settings() {
   const [settings, setSettings] = useState(loadSettings);
   const [saved, setSaved] = useState(false);
+  const [deleteMsg, setDeleteMsg] = useState(null);
 
   function update(key, value) {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -13,6 +15,18 @@ export default function Settings() {
   function persist() {
     saveSettings(settings);
     setSaved(true);
+  }
+
+  async function handleDeleteAll() {
+    if (!window.confirm("Delete all sessions and recordings? This cannot be undone.")) {
+      return;
+    }
+    try {
+      const { deleted } = await deleteAllSessions();
+      setDeleteMsg(`Deleted ${deleted} session${deleted === 1 ? "" : "s"}.`);
+    } catch (e) {
+      setDeleteMsg(e.message);
+    }
   }
 
   return (
@@ -44,10 +58,10 @@ export default function Settings() {
           onChange={(v) => update("keepRecordings", v)}
         />
         <Field label="Your data">
-          <button className="ghost-btn" disabled>
+          <button className="ghost-btn" onClick={handleDeleteAll}>
             Delete all sessions
           </button>
-          <Soon />
+          {deleteMsg && <span className="settings-hint">{deleteMsg}</span>}
         </Field>
       </Section>
 
@@ -94,8 +108,10 @@ export default function Settings() {
         {saved ? "Saved ✓" : "Save settings"}
       </button>
       <p className="settings-note">
-        Settings are stored in your browser. Wiring them into the analysis
-        pipeline is part of a future update.
+        Settings are stored in your browser. <strong>Keep recordings</strong>,{" "}
+        <strong>AI coaching feedback</strong>, and <strong>Delete all
+        sessions</strong> take effect now; the rest are placeholders for a future
+        update.
       </p>
     </div>
   );

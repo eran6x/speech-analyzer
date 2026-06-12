@@ -1,2 +1,5 @@
 .venv
 .dev/
+
+*_plan.md
+*.log
