@@ -1,11 +1,48 @@
-import { useState } from "react";
-import { deleteAllSessions } from "../api.js";
+import { useEffect, useState } from "react";
+import {
+  deleteAllSessions,
+  deleteVoice,
+  enrollVoice,
+  getVoice,
+} from "../api.js";
 import { loadSettings, saveSettings } from "../settings.js";
+import Recorder from "./Recorder.jsx";
 
 export default function Settings() {
   const [settings, setSettings] = useState(loadSettings);
   const [saved, setSaved] = useState(false);
   const [deleteMsg, setDeleteMsg] = useState(null);
+  const [voiceEnrolled, setVoiceEnrolled] = useState(false);
+  const [voiceMsg, setVoiceMsg] = useState(null);
+  const [enrolling, setEnrolling] = useState(false);
+
+  useEffect(() => {
+    getVoice().then((v) => setVoiceEnrolled(v.enrolled)).catch(() => {});
+  }, []);
+
+  async function handleEnroll(blob) {
+    setEnrolling(true);
+    setVoiceMsg(null);
+    try {
+      await enrollVoice(blob);
+      setVoiceEnrolled(true);
+      setVoiceMsg("Voice enrolled ✓");
+    } catch (e) {
+      setVoiceMsg(e.message);
+    } finally {
+      setEnrolling(false);
+    }
+  }
+
+  async function removeVoice() {
+    try {
+      await deleteVoice();
+      setVoiceEnrolled(false);
+      setVoiceMsg("Voice sample deleted.");
+    } catch (e) {
+      setVoiceMsg(e.message);
+    }
+  }
 
   function update(key, value) {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -48,6 +85,26 @@ export default function Settings() {
             onChange={(e) => update("email", e.target.value)}
           />
         </Field>
+      </Section>
+
+      <Section title="Voice">
+        <p className="settings-note">
+          Record a short, clean ~15s sample (read any neutral passage). It clones
+          your voice for the "ideal delivery" examples and stays on this machine.
+          If you don't enroll, each session's own recording is used instead.
+        </p>
+        <Field label="Enrollment">
+          <span className="settings-hint">
+            {voiceEnrolled ? "Enrolled ✓" : "Not enrolled"}
+          </span>
+          {voiceEnrolled && (
+            <button className="ghost-btn" onClick={removeVoice}>
+              Delete
+            </button>
+          )}
+        </Field>
+        <Recorder onRecorded={handleEnroll} disabled={enrolling} />
+        {voiceMsg && <p className="settings-hint">{voiceMsg}</p>}
       </Section>
 
       <Section title="Privacy">

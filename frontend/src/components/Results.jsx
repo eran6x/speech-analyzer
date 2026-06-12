@@ -1,9 +1,27 @@
+import { useState } from "react";
 import { DIMENSION_COLORS, METRIC_DIMENSION } from "../colors.js";
+import { audioUrl, generateIdeal, idealAudioUrl } from "../api.js";
 import WaveformPlayer from "./WaveformPlayer.jsx";
 
 export default function Results({ session }) {
+  const [ideal, setIdeal] = useState(null); // session updated with ideal audio
+  const [genStatus, setGenStatus] = useState("idle"); // idle | loading | error
+  const [genError, setGenError] = useState(null);
+
   if (!session) return null;
   const { scores, metrics, transcript, duration_sec, feedback } = session;
+
+  async function makeIdeal() {
+    setGenStatus("loading");
+    setGenError(null);
+    try {
+      setIdeal(await generateIdeal(session.id));
+      setGenStatus("idle");
+    } catch (e) {
+      setGenError(e.message);
+      setGenStatus("error");
+    }
+  }
 
   return (
     <div className="card results">
@@ -26,10 +44,42 @@ export default function Results({ session }) {
         </div>
       )}
 
-      {session.id && session.audio_path && (
+      {session.id && (session.audio_path || ideal) && (
         <details className="collapsible" open>
           <summary>Playback</summary>
-          <WaveformPlayer session={session} />
+
+          {session.audio_path && (
+            <>
+              <p className="playback-label">Your recording</p>
+              <WaveformPlayer
+                url={audioUrl(session.id)}
+                annotations={session.annotations || []}
+              />
+            </>
+          )}
+
+          {ideal?.ideal_audio_path ? (
+            <div className="ideal-block">
+              <p className="playback-label">Ideal delivery (your voice)</p>
+              {ideal.delivery_style && (
+                <p className="ideal-style">🎯 {ideal.delivery_style}</p>
+              )}
+              <WaveformPlayer url={idealAudioUrl(session.id)} />
+            </div>
+          ) : (
+            <div className="ideal-cta">
+              <button
+                className="primary-btn"
+                onClick={makeIdeal}
+                disabled={genStatus === "loading"}
+              >
+                {genStatus === "loading"
+                  ? "Generating…"
+                  : "✨ Hear ideal delivery"}
+              </button>
+              {genError && <p className="error">{genError}</p>}
+            </div>
+          )}
         </details>
       )}
 

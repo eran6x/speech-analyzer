@@ -8,23 +8,21 @@ needs and later phases just enrich the responses.
 
 from __future__ import annotations
 
-import io
 import os
+import tempfile
 import uuid
-import wave
 from datetime import datetime, timezone
 from pathlib import Path
 
-import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
-from . import coaching, db, stats
+from . import coaching, db, stats, tts
 from .acoustic import compute_metrics
-from .audio_io import load_waveform
+from .audio_io import to_wav_bytes, to_wav_file
 from .models import Session, Stats, Topic
-from .scoring import compute_scores
+from .scoring import CONFIG as SCORING_CONFIG, compute_scores
 from .topics import CATEGORIES, suggest_topic
 from .transcription import transcribe
 
@@ -34,6 +32,9 @@ RECORDINGS_DIR = Path(
         str(Path(__file__).resolve().parent.parent / "recordings"),
     )
 )
+# Single-user voice enrollment sample (becomes per-account in the hosted product).
+VOICE_DIR = RECORDINGS_DIR / "voice"
+ENROLLMENT_PATH = VOICE_DIR / "enrollment.wav"
 
 app = FastAPI(title="Speech Analyzer", version="0.1.0")
 
@@ -51,6 +52,7 @@ app.add_middleware(
 def _startup() -> None:
     db.init_db()
     RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
+    VOICE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @app.get("/categories", response_model=list[str])
@@ -147,25 +149,125 @@ def get_audio(session_id: str) -> Response:
     if session is None or not session.audio_path:
         raise HTTPException(status_code=404, detail="Audio not found")
     path = Path(session.audio_path).resolve()
-    # Only ever serve files from within the recordings directory.
-    recordings_root = RECORDINGS_DIR.resolve()
-    if recordings_root not in path.parents or not path.exists():
+    if not _within_recordings(path):
         raise HTTPException(status_code=404, detail="Audio not found")
-
     # Transcode to WAV so every browser can decode it for playback + waveform
     # (MediaRecorder webm/opus isn't reliably decodable via WebAudio).
     try:
-        samples, sr = load_waveform(str(path))
+        return Response(content=to_wav_bytes(str(path)), media_type="audio/wav")
     except Exception:
         raise HTTPException(status_code=500, detail="Could not decode audio")
-    pcm = (np.clip(samples, -1.0, 1.0) * 32767.0).astype("<i2")
-    buf = io.BytesIO()
-    with wave.open(buf, "wb") as w:
-        w.setnchannels(1)
-        w.setsampwidth(2)
-        w.setframerate(sr)
-        w.writeframes(pcm.tobytes())
-    return Response(content=buf.getvalue(), media_type="audio/wav")
+
+
+def _within_recordings(path: Path) -> bool:
+    """Path-traversal guard: the file must live under RECORDINGS_DIR and exist."""
+    return RECORDINGS_DIR.resolve() in path.parents and path.exists()
+
+
+def _resolve_voice_ref(session: Session) -> tuple[str | None, bool]:
+    """Return (wav_path, is_temp) for cloning: enrollment if present, else the
+    session's own recording transcoded to a temp WAV. (None, False) if neither."""
+    if ENROLLMENT_PATH.exists():
+        return str(ENROLLMENT_PATH), False
+    if session.audio_path:
+        src = Path(session.audio_path).resolve()
+        if _within_recordings(src):
+            tmp = tempfile.mktemp(suffix=".wav")
+            to_wav_file(str(src), tmp)
+            return tmp, True
+    return None, False
+
+
+@app.post("/voice")
+async def set_voice(audio: UploadFile = File(...)) -> dict:
+    """Save a voice-enrollment sample (transcoded to WAV) for cloning."""
+    VOICE_DIR.mkdir(parents=True, exist_ok=True)
+    suffix = Path(audio.filename or "").suffix or ".webm"
+    tmp = VOICE_DIR / f"upload{suffix}"
+    tmp.write_bytes(await audio.read())
+    try:
+        to_wav_file(str(tmp), str(ENROLLMENT_PATH))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Could not process voice sample")
+    finally:
+        tmp.unlink(missing_ok=True)
+    return {"enrolled": True}
+
+
+@app.get("/voice")
+def get_voice() -> dict:
+    return {"enrolled": ENROLLMENT_PATH.exists()}
+
+
+@app.delete("/voice")
+def delete_voice() -> dict:
+    ENROLLMENT_PATH.unlink(missing_ok=True)
+    return {"enrolled": False}
+
+
+@app.post("/sessions/{session_id}/ideal", response_model=Session)
+def generate_ideal(session_id: str) -> Session:
+    session = db.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if not session.transcript.strip():
+        raise HTTPException(status_code=400, detail="No transcript to synthesize")
+
+    provider = tts.get_provider()
+    if provider is None or not provider.available():
+        detail = "Voice TTS engine unavailable. Install requirements-tts.txt and set TTS_PROVIDER=local."
+        reason = getattr(provider, "reason", None)
+        if reason:
+            detail += f" ({reason})"
+        raise HTTPException(status_code=503, detail=detail)
+
+    ref_path, is_temp = _resolve_voice_ref(session)
+    if ref_path is None:
+        raise HTTPException(
+            status_code=400,
+            detail="No voice reference: enroll a voice sample in Settings, or enable 'keep recordings'.",
+        )
+
+    try:
+        style_text = coaching.generate_delivery_style(
+            session.transcript, session.metrics, session.scores
+        )
+        pace = SCORING_CONFIG["pace"]
+        target_wpm = (pace["ideal_min"] + pace["ideal_max"]) / 2
+        user_wpm = session.metrics.wpm or target_wpm
+        speed = max(0.7, min(1.3, target_wpm / user_wpm)) if user_wpm > 0 else 1.0
+        wav = provider.synthesize(
+            session.transcript,
+            ref_path,
+            {"instruction": style_text, "target_wpm": target_wpm, "speed": round(speed, 3)},
+        )
+    except HTTPException:
+        raise
+    except NotImplementedError as exc:
+        raise HTTPException(status_code=501, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Generation failed: {exc}")
+    finally:
+        if is_temp and ref_path and os.path.exists(ref_path):
+            os.remove(ref_path)
+
+    ideal_path = RECORDINGS_DIR / f"{session_id}_ideal.wav"
+    ideal_path.write_bytes(wav)
+    session.ideal_audio_path = str(ideal_path)
+    session.delivery_style = style_text
+    db.save_session(session)
+    return session
+
+
+@app.get("/sessions/{session_id}/ideal/audio")
+def get_ideal_audio(session_id: str) -> Response:
+    session = db.get_session(session_id)
+    if session is None or not session.ideal_audio_path:
+        raise HTTPException(status_code=404, detail="Ideal audio not found")
+    path = Path(session.ideal_audio_path).resolve()
+    if not _within_recordings(path):
+        raise HTTPException(status_code=404, detail="Ideal audio not found")
+    return Response(content=path.read_bytes(), media_type="audio/wav")
 
 
 @app.get("/sessions", response_model=list[Session])

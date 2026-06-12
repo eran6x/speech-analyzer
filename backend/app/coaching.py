@@ -168,3 +168,67 @@ def generate_topic(history: list[Session]) -> Optional[Topic]:
         return _parse_topic(text)
     except Exception:
         return None
+
+
+# --- Delivery-style guidance for the "ideal delivery" audio (Phase 6) ---
+
+# Center of the ideal pace band (kept in sync with scoring.CONFIG["pace"]).
+_IDEAL_WPM = 145
+
+DELIVERY_SYSTEM = (
+    "You are a speech-delivery director. Given a transcript and its delivery "
+    "metrics/scores, write a ONE-sentence instruction for how the SAME words "
+    "should ideally be delivered to fix the weak areas — pace, pauses, pitch "
+    "variation, projection, no upspeak, no fillers/hedging. Be concrete and "
+    "vocal-direction style (e.g. 'Calm and confident at ~145 wpm, with a "
+    "deliberate beat at each sentence break and lift on key words; statements "
+    "land flat'). Output ONLY that sentence — no preamble, under 40 words."
+)
+
+
+def _fallback_delivery_style(metrics: Metrics) -> str:
+    bits = [f"Speak at a steady ~{_IDEAL_WPM} words per minute"]
+    if metrics.pause_count is not None and metrics.pause_count <= 1:
+        bits.append("add deliberate pauses at sentence boundaries")
+    if metrics.pitch_variability is not None and metrics.pitch_variability < 20:
+        bits.append("vary your pitch on key words instead of staying flat")
+    if metrics.upspeak_count:
+        bits.append("end statements on a falling tone, not rising")
+    if metrics.filler_count or metrics.hedge_count:
+        bits.append("drop fillers and hedging")
+    bits.append("sound calm and confident")
+    return ", ".join(bits) + "."
+
+
+def generate_delivery_style(transcript: str, metrics: Metrics, scores: Scores) -> str:
+    """Short vocal-direction instruction for the ideal delivery.
+
+    Always returns a usable string: a metric-derived fallback when there's no
+    API key or the call fails, so audio generation works offline.
+    """
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        return _fallback_delivery_style(metrics)
+    try:
+        import anthropic
+
+        client = anthropic.Anthropic()
+        response = client.messages.create(
+            model=MODEL,
+            max_tokens=512,
+            extra_body={"output_config": {"effort": "low"}},
+            system=DELIVERY_SYSTEM,
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        f"Scores: {scores.model_dump(exclude_none=True)}\n"
+                        f"Metrics: {metrics.model_dump(exclude_none=True)}\n"
+                        f"Transcript:\n{transcript}"
+                    ),
+                }
+            ],
+        )
+        text = "".join(b.text for b in response.content if b.type == "text").strip()
+        return text or _fallback_delivery_style(metrics)
+    except Exception:
+        return _fallback_delivery_style(metrics)

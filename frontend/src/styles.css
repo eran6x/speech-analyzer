@@ -250,6 +250,31 @@ header h1 {
 }
 
 /* Waveform playback */
+.playback-label {
+  margin: 0.5rem 0 0.4rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.ideal-block {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+.ideal-style {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--text);
+  margin: 0 0 0.6rem;
+}
+
+.ideal-cta {
+  margin-top: 1rem;
+}
+
 .waveform-canvas {
   background: rgba(255, 255, 255, 0.03);
   border-radius: 8px;

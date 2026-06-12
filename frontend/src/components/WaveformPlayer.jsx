@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js";
-import { audioUrl } from "../api.js";
 
 // Marker colors per annotation kind (translucent so the waveform shows through).
 const KIND_COLORS = {
@@ -11,7 +10,7 @@ const KIND_COLORS = {
   upspeak: "rgba(255, 212, 59, 0.35)",
 };
 
-export default function WaveformPlayer({ session }) {
+export default function WaveformPlayer({ url, annotations = [] }) {
   const containerRef = useRef(null);
   const wsRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -22,7 +21,7 @@ export default function WaveformPlayer({ session }) {
     const regions = RegionsPlugin.create();
     const ws = WaveSurfer.create({
       container: containerRef.current,
-      url: audioUrl(session.id),
+      url,
       height: 88,
       waveColor: "#3a3f4b",
       progressColor: "#6ea8fe",
@@ -34,7 +33,7 @@ export default function WaveformPlayer({ session }) {
     wsRef.current = ws;
 
     ws.on("decode", () => {
-      for (const a of session.annotations || []) {
+      for (const a of annotations) {
         regions.addRegion({
           start: a.start,
           end: Math.max(a.end, a.start + 0.04),
@@ -49,7 +48,6 @@ export default function WaveformPlayer({ session }) {
     ws.on("pause", () => setPlaying(false));
     ws.on("finish", () => setPlaying(false));
     ws.on("error", () => setError(true));
-    // Click a marker to jump there.
     regions.on("region-clicked", (region, e) => {
       e.stopPropagation();
       ws.setTime(region.start);
@@ -57,7 +55,7 @@ export default function WaveformPlayer({ session }) {
     });
 
     return () => ws.destroy();
-  }, [session.id]);
+  }, [url]);
 
   if (error) {
     return <p className="status">Could not load audio for playback.</p>;
@@ -67,20 +65,19 @@ export default function WaveformPlayer({ session }) {
     <div className="waveform">
       <div ref={containerRef} className="waveform-canvas" />
       <div className="waveform-controls">
-        <button
-          className="primary-btn"
-          onClick={() => wsRef.current?.playPause()}
-        >
+        <button className="primary-btn" onClick={() => wsRef.current?.playPause()}>
           {playing ? "❚❚ Pause" : "▶ Play"}
         </button>
-        <div className="waveform-legend">
-          {Object.entries(KIND_COLORS).map(([kind, color]) => (
-            <span key={kind} className="dim-legend-item">
-              <span className="dim-swatch" style={{ background: color }} />
-              {kind}
-            </span>
-          ))}
-        </div>
+        {annotations.length > 0 && (
+          <div className="waveform-legend">
+            {Object.entries(KIND_COLORS).map(([kind, color]) => (
+              <span key={kind} className="dim-legend-item">
+                <span className="dim-swatch" style={{ background: color }} />
+                {kind}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -33,6 +33,44 @@ export function audioUrl(sessionId) {
   return `${API_BASE}/sessions/${sessionId}/audio`;
 }
 
+export function idealAudioUrl(sessionId) {
+  return `${API_BASE}/sessions/${sessionId}/ideal/audio`;
+}
+
+async function detail(res, fallback) {
+  try {
+    return (await res.json()).detail || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export async function generateIdeal(sessionId) {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/ideal`, { method: "POST" });
+  if (!res.ok) throw new Error(await detail(res, `Generation failed (${res.status})`));
+  return res.json();
+}
+
+export async function getVoice() {
+  const res = await fetch(`${API_BASE}/voice`);
+  if (!res.ok) throw new Error(`Failed to read voice status (${res.status})`);
+  return res.json();
+}
+
+export async function enrollVoice(audioBlob) {
+  const form = new FormData();
+  form.append("audio", audioBlob, "voice.webm");
+  const res = await fetch(`${API_BASE}/voice`, { method: "POST", body: form });
+  if (!res.ok) throw new Error(await detail(res, `Enrollment failed (${res.status})`));
+  return res.json();
+}
+
+export async function deleteVoice() {
+  const res = await fetch(`${API_BASE}/voice`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`Failed to delete voice (${res.status})`);
+  return res.json();
+}
+
 export async function analyze(audioBlob, topic, opts = {}) {
   const form = new FormData();
   form.append("audio", audioBlob, "recording.webm");

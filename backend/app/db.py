@@ -40,9 +40,11 @@ def init_db() -> None:
 
 
 def save_session(session: Session) -> None:
+    # INSERT OR REPLACE so a session can be updated in place (e.g. when the
+    # ideal-delivery audio is generated after the fact).
     with _connect() as conn:
         conn.execute(
-            "INSERT INTO sessions (id, timestamp, data) VALUES (?, ?, ?)",
+            "INSERT OR REPLACE INTO sessions (id, timestamp, data) VALUES (?, ?, ?)",
             (session.id, session.timestamp, session.model_dump_json()),
         )
 

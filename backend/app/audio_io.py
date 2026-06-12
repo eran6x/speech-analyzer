@@ -7,6 +7,9 @@ container into a mono float32 waveform we can hand to parselmouth.
 
 from __future__ import annotations
 
+import io
+import wave
+
 import av
 import numpy as np
 
@@ -32,3 +35,22 @@ def load_waveform(path: str, target_sr: int = TARGET_SR) -> tuple[np.ndarray, in
 
     samples = np.concatenate(chunks).astype(np.float32) / 32768.0
     return samples, target_sr
+
+
+def to_wav_bytes(src_path: str, target_sr: int = TARGET_SR) -> bytes:
+    """Decode any supported audio file to mono 16-bit WAV bytes."""
+    samples, sr = load_waveform(src_path, target_sr)
+    pcm = (np.clip(samples, -1.0, 1.0) * 32767.0).astype("<i2")
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(sr)
+        w.writeframes(pcm.tobytes())
+    return buf.getvalue()
+
+
+def to_wav_file(src_path: str, dst_path: str, target_sr: int = TARGET_SR) -> None:
+    """Decode any supported audio file and write it as a mono 16-bit WAV."""
+    with open(dst_path, "wb") as f:
+        f.write(to_wav_bytes(src_path, target_sr))

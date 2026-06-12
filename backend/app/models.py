@@ -71,6 +71,9 @@ class Session(BaseModel):
     audio_path: Optional[str] = None
     # Optional so sessions saved before Phase 3 still load.
     annotations: Optional[list[Annotation]] = None
+    # Phase 6: generated "ideal delivery" audio in the user's cloned voice.
+    ideal_audio_path: Optional[str] = None
+    delivery_style: Optional[str] = None
 
 
 class Averages(BaseModel):

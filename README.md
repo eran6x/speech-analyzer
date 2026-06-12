@@ -37,9 +37,19 @@ transcript), **Trends**, **Help** (what every score/metric means), and
   there (WaveSurfer.js + `GET /sessions/{id}/audio`). Statistics colors match
   the trend-line colors for pace/pauses/confidence/fluency.
 
-Deferred: session compare, exportable report, and wiring Settings into the
-pipeline → [Phase5_plan.md](Phase5_plan.md). Licensing (AGPLv3 + commercial
-use) → [Phase4_plan.md](Phase4_plan.md). Phase 3 designs → [Phase3_plan.md](Phase3_plan.md).
+Settings wiring (delete-all, keep-recordings, coaching toggle) is now live.
+Remaining: session compare + exportable report → [Phase5_plan.md](Phase5_plan.md).
+Licensing (AGPLv3 + commercial use) → [Phase4_plan.md](Phase4_plan.md).
+Phase 3 designs → [Phase3_plan.md](Phase3_plan.md).
+
+**Phase 6 (voice-cloned "ideal delivery") — core landed:** after a session,
+"✨ Hear ideal delivery" generates the same transcript spoken back in a clone of
+your voice with optimal delivery, shown as an A/B player against your recording.
+Pluggable TTS (`TTS_PROVIDER`, default local Coqui XTTS-v2; ElevenLabs stubbed
+for the hosted roadmap), Claude-authored delivery style, voice enrollment in
+Settings with per-session fallback. The local engine needs
+[backend/requirements-tts.txt](backend/requirements-tts.txt) + a GPU. Design +
+cloud roadmap → [Phase6_plan.md](Phase6_plan.md).
 
 The scoring config (ideal ranges + weights) lives in one place:
 [backend/app/scoring.py](backend/app/scoring.py) → `CONFIG`.

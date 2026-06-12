@@ -1,0 +1,23 @@
+# Optional — Phase 6 local voice-clone TTS ("ideal delivery" audio).
+# Heavy (model weights ~2GB, PyTorch). A GPU is recommended; on CPU/Apple
+# Silicon it works but synthesis is slow. The core app runs fine without these.
+#
+# Install:
+#   ../.venv/bin/pip install -r requirements-tts.txt
+#   # macOS also needs ffmpeg for torchcodec's audio IO:
+#   brew install ffmpeg
+#
+# Then set TTS_PROVIDER=local (the default). First synthesis downloads the
+# XTTS-v2 weights once and auto-accepts its (non-commercial) license via
+# COQUI_TOS_AGREED=1 (set automatically by the app).
+#
+# Versions are loose because the right torch/torchaudio/torchcodec build depends
+# on your platform/CUDA — pin them once you've confirmed a working combo.
+
+coqui-tts>=0.27          # maintained Coqui fork; XTTS-v2 voice cloning
+torch>=2.1               # install the CUDA build matching your GPU/driver
+torchaudio>=2.1          # must match the torch version
+torchcodec>=0.14         # audio IO for torch >= 2.9 (needs system ffmpeg)
+# coqui-tts pulls transformers, but its lower-bound pin lets transformers 5.x in,
+# which removed a symbol coqui-tts still imports — hold it on the 4.x line.
+transformers>=4.57,<5
