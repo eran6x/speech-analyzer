@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   deleteAllSessions,
+  deleteRecordings,
   deleteVoice,
   enrollVoice,
   getVoice,
@@ -54,13 +55,25 @@ export default function Settings() {
     setSaved(true);
   }
 
+  async function handleDeleteRecordings() {
+    if (!window.confirm("Delete all stored audio recordings? Your sessions, scores, and transcripts are kept.")) {
+      return;
+    }
+    try {
+      const { deleted_files } = await deleteRecordings();
+      setDeleteMsg(`Deleted ${deleted_files} recording file${deleted_files === 1 ? "" : "s"}; session data kept.`);
+    } catch (e) {
+      setDeleteMsg(e.message);
+    }
+  }
+
   async function handleDeleteAll() {
-    if (!window.confirm("Delete all sessions and recordings? This cannot be undone.")) {
+    if (!window.confirm("Delete ALL data — every session, score, transcript, and recording? This cannot be undone.")) {
       return;
     }
     try {
       const { deleted } = await deleteAllSessions();
-      setDeleteMsg(`Deleted ${deleted} session${deleted === 1 ? "" : "s"}.`);
+      setDeleteMsg(`Deleted all data (${deleted} session${deleted === 1 ? "" : "s"}).`);
     } catch (e) {
       setDeleteMsg(e.message);
     }
@@ -114,12 +127,17 @@ export default function Settings() {
           checked={settings.keepRecordings}
           onChange={(v) => update("keepRecordings", v)}
         />
-        <Field label="Your data">
-          <button className="ghost-btn" onClick={handleDeleteAll}>
-            Delete all sessions
+        <Field label="Recordings only">
+          <button className="ghost-btn" onClick={handleDeleteRecordings}>
+            Delete recordings
           </button>
-          {deleteMsg && <span className="settings-hint">{deleteMsg}</span>}
         </Field>
+        <Field label="Everything">
+          <button className="ghost-btn danger" onClick={handleDeleteAll}>
+            Delete all data
+          </button>
+        </Field>
+        {deleteMsg && <p className="settings-hint">{deleteMsg}</p>}
       </Section>
 
       <Section title="Security">

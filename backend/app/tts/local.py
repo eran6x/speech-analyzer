@@ -21,6 +21,22 @@ MODEL_NAME = os.getenv("XTTS_MODEL", "tts_models/multilingual/multi-dataset/xtts
 LANGUAGE = os.getenv("TTS_LANGUAGE", "en")
 
 
+def _decode_params() -> dict:
+    """XTTS decoding knobs that smooth out metallic/robotic artifacts.
+
+    Tunable via env. Lower temperature = steadier; repetition_penalty curbs
+    buzzy loops; text splitting keeps long inputs coherent.
+    """
+    return {
+        "temperature": float(os.getenv("XTTS_TEMPERATURE", "0.7")),
+        "repetition_penalty": float(os.getenv("XTTS_REPETITION_PENALTY", "2.0")),
+        "top_k": int(os.getenv("XTTS_TOP_K", "50")),
+        "top_p": float(os.getenv("XTTS_TOP_P", "0.85")),
+        "length_penalty": float(os.getenv("XTTS_LENGTH_PENALTY", "1.0")),
+        "enable_text_splitting": True,
+    }
+
+
 class LocalTTS(TTSProvider):
     name = "local"
 
@@ -59,13 +75,14 @@ class LocalTTS(TTSProvider):
         speed = float(style.get("speed", 1.0))
 
         out_path = tempfile.mktemp(suffix=".wav")
-        kwargs = dict(text=text, speaker_wav=voice_ref_path, language=LANGUAGE, file_path=out_path)
+        base = dict(text=text, speaker_wav=voice_ref_path, language=LANGUAGE, file_path=out_path)
+        extras = {**_decode_params(), "speed": speed}
         try:
             try:
-                model.tts_to_file(speed=speed, **kwargs)
+                model.tts_to_file(**base, **extras)
             except TypeError:
-                # Engine/version doesn't accept `speed` — render at default rate.
-                model.tts_to_file(**kwargs)
+                # Engine/version rejects a tuning kwarg — render with defaults.
+                model.tts_to_file(**base)
             with open(out_path, "rb") as f:
                 return f.read()
         finally:

@@ -95,3 +95,19 @@ export async function deleteAllSessions() {
   if (!res.ok) throw new Error(`Failed to delete sessions (${res.status})`);
   return res.json();
 }
+
+export async function deleteRecordings() {
+  const res = await fetch(`${API_BASE}/recordings`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`Failed to delete recordings (${res.status})`);
+  return res.json();
+}
+
+export async function updateTranscript(sessionId, transcript) {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/transcript`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ transcript }),
+  });
+  if (!res.ok) throw new Error(`Failed to save transcript (${res.status})`);
+  return res.json();
+}

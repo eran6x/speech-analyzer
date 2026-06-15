@@ -64,6 +64,34 @@ def delete_all_sessions() -> int:
         return cur.rowcount
 
 
+def clear_media_paths() -> int:
+    """Null out audio/ideal-audio paths on all sessions (keeps stats/transcript).
+
+    Used when deleting recordings but retaining session data. Returns the number
+    of sessions updated.
+    """
+    sessions = list_sessions()
+    with _connect() as conn:
+        for s in sessions:
+            s.audio_path = None
+            s.ideal_audio_path = None
+            conn.execute(
+                "INSERT OR REPLACE INTO sessions (id, timestamp, data) VALUES (?, ?, ?)",
+                (s.id, s.timestamp, s.model_dump_json()),
+            )
+    return len(sessions)
+
+
+def update_transcript(session_id: str, transcript: str) -> Session | None:
+    """Replace a session's transcript (e.g. user correction). Returns the session."""
+    session = get_session(session_id)
+    if session is None:
+        return None
+    session.transcript = transcript
+    save_session(session)
+    return session
+
+
 def get_session(session_id: str) -> Session | None:
     with _connect() as conn:
         row = conn.execute(

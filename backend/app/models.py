@@ -76,6 +76,10 @@ class Session(BaseModel):
     delivery_style: Optional[str] = None
 
 
+class TranscriptUpdate(BaseModel):
+    transcript: str
+
+
 class Averages(BaseModel):
     overall: Optional[float] = None
     pace: Optional[float] = None

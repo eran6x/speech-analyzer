@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { DIMENSION_COLORS, METRIC_DIMENSION } from "../colors.js";
-import { audioUrl, generateIdeal, idealAudioUrl } from "../api.js";
+import { audioUrl, generateIdeal, idealAudioUrl, updateTranscript } from "../api.js";
 import WaveformPlayer from "./WaveformPlayer.jsx";
 
 export default function Results({ session }) {
   const [ideal, setIdeal] = useState(null); // session updated with ideal audio
   const [genStatus, setGenStatus] = useState("idle"); // idle | loading | error
   const [genError, setGenError] = useState(null);
+  const [transcriptText, setTranscriptText] = useState(session?.transcript || "");
+  const [savedTranscript, setSavedTranscript] = useState(session?.transcript || "");
+  const [tStatus, setTStatus] = useState("idle"); // idle | saving | error
+  const [tMsg, setTMsg] = useState(null);
 
   if (!session) return null;
-  const { scores, metrics, transcript, duration_sec, feedback } = session;
+  const { scores, metrics, duration_sec, feedback } = session;
 
   async function makeIdeal() {
     setGenStatus("loading");
@@ -20,6 +24,22 @@ export default function Results({ session }) {
     } catch (e) {
       setGenError(e.message);
       setGenStatus("error");
+    }
+  }
+
+  async function saveTranscript() {
+    setTStatus("saving");
+    setTMsg(null);
+    try {
+      const updated = await updateTranscript(session.id, transcriptText);
+      setSavedTranscript(updated.transcript);
+      setTranscriptText(updated.transcript);
+      setIdeal(null); // previous ideal is stale; let them regenerate
+      setTStatus("idle");
+      setTMsg("Saved ✓");
+    } catch (e) {
+      setTStatus("error");
+      setTMsg(e.message);
     }
   }
 
@@ -106,7 +126,27 @@ export default function Results({ session }) {
 
       <details className="collapsible">
         <summary>Transcript</summary>
-        <p className="transcript">{transcript || "(no speech detected)"}</p>
+        <textarea
+          className="transcript-edit"
+          value={transcriptText}
+          onChange={(e) => setTranscriptText(e.target.value)}
+          rows={4}
+          placeholder="(no speech detected)"
+        />
+        <div className="transcript-actions">
+          <button
+            className="ghost-btn"
+            onClick={saveTranscript}
+            disabled={tStatus === "saving" || transcriptText === savedTranscript}
+          >
+            {tStatus === "saving" ? "Saving…" : "Save transcript"}
+          </button>
+          {tMsg && <span className="settings-hint">{tMsg}</span>}
+        </div>
+        <p className="settings-hint">
+          Correct the transcript before generating ideal delivery. Scores aren't
+          recomputed from edits.
+        </p>
       </details>
     </div>
   );

@@ -126,7 +126,7 @@ export default function App() {
 
           {session && (
             <>
-              <Results session={session} />
+              <Results key={session.id} session={session} />
               <button className="primary-btn newtest" onClick={newTest}>
                 ↻ New test
               </button>

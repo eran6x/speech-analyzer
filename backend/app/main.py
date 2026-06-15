@@ -21,7 +21,7 @@ from fastapi.responses import Response
 from . import coaching, db, stats, tts
 from .acoustic import compute_metrics
 from .audio_io import to_wav_bytes, to_wav_file
-from .models import Session, Stats, Topic
+from .models import Session, Stats, Topic, TranscriptUpdate
 from .scoring import CONFIG as SCORING_CONFIG, compute_scores
 from .topics import CATEGORIES, suggest_topic
 from .transcription import transcribe
@@ -35,6 +35,9 @@ RECORDINGS_DIR = Path(
 # Single-user voice enrollment sample (becomes per-account in the hosted product).
 VOICE_DIR = RECORDINGS_DIR / "voice"
 ENROLLMENT_PATH = VOICE_DIR / "enrollment.wav"
+# Voice-clone references use a higher sample rate than the 16 kHz analysis path —
+# 16 kHz references make XTTS sound metallic.
+CLONE_SR = int(os.getenv("CLONE_SR", "24000"))
 
 app = FastAPI(title="Speech Analyzer", version="0.1.0")
 
@@ -128,14 +131,44 @@ async def analyze(
     return session
 
 
-@app.delete("/sessions")
-def delete_sessions() -> dict:
-    """Delete all sessions and remove stored recordings (privacy)."""
-    deleted = db.delete_all_sessions()
+def _delete_recording_files() -> int:
+    """Remove session + ideal audio files (top level of RECORDINGS_DIR).
+    Leaves the voice/ enrollment subdirectory intact."""
+    removed = 0
     for f in RECORDINGS_DIR.glob("*"):
         if f.is_file():
             f.unlink(missing_ok=True)
+            removed += 1
+    return removed
+
+
+@app.delete("/recordings")
+def delete_recordings() -> dict:
+    """Delete stored audio only; keep sessions, stats, transcripts, scores."""
+    files = _delete_recording_files()
+    cleared = db.clear_media_paths()
+    return {"deleted_files": files, "sessions_kept": cleared}
+
+
+@app.delete("/sessions")
+def delete_sessions() -> dict:
+    """Delete ALL data: every session plus stored recordings (privacy)."""
+    deleted = db.delete_all_sessions()
+    _delete_recording_files()
     return {"deleted": deleted}
+
+
+@app.put("/sessions/{session_id}/transcript", response_model=Session)
+def edit_transcript(session_id: str, body: TranscriptUpdate) -> Session:
+    """Replace a session's transcript (user correction before ideal delivery).
+
+    Scores/acoustic metrics are not recomputed — this updates the text used for
+    the ideal-delivery synthesis and what's displayed.
+    """
+    session = db.update_transcript(session_id, body.transcript.strip())
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
 
 
 @app.get("/stats", response_model=Stats)
@@ -173,7 +206,7 @@ def _resolve_voice_ref(session: Session) -> tuple[str | None, bool]:
         src = Path(session.audio_path).resolve()
         if _within_recordings(src):
             tmp = tempfile.mktemp(suffix=".wav")
-            to_wav_file(str(src), tmp)
+            to_wav_file(str(src), tmp, CLONE_SR)
             return tmp, True
     return None, False
 
@@ -186,7 +219,7 @@ async def set_voice(audio: UploadFile = File(...)) -> dict:
     tmp = VOICE_DIR / f"upload{suffix}"
     tmp.write_bytes(await audio.read())
     try:
-        to_wav_file(str(tmp), str(ENROLLMENT_PATH))
+        to_wav_file(str(tmp), str(ENROLLMENT_PATH), CLONE_SR)
     except Exception:
         raise HTTPException(status_code=400, detail="Could not process voice sample")
     finally:
