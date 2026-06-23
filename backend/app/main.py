@@ -18,9 +18,9 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
-from . import coaching, db, stats, tts, usage
+from . import coaching, db, stats, tts, usage, usage_log
 from .acoustic import compute_metrics
-from .audio_io import load_waveform, to_wav_bytes, to_wav_file
+from .audio_io import load_waveform, to_wav_bytes, to_wav_file, trim_silence
 from .models import Session, Stats, Topic, TranscriptUpdate
 from .scoring import CONFIG as SCORING_CONFIG, compute_scores
 from .topics import CATEGORIES, suggest_topic
@@ -84,10 +84,20 @@ async def analyze(
 ) -> Session:
     session_id = str(uuid.uuid4())
 
-    # Persist the raw upload so we can re-analyze it as metrics evolve.
     suffix = Path(audio.filename or "").suffix or ".webm"
-    audio_path = RECORDINGS_DIR / f"{session_id}{suffix}"
-    audio_path.write_bytes(await audio.read())
+    raw_path = RECORDINGS_DIR / f"{session_id}{suffix}"
+    raw_path.write_bytes(await audio.read())
+
+    # Trim silence before/after the user speaks so it isn't evaluated
+    # (otherwise it inflates pause count and lowers articulation). The trimmed
+    # WAV is used for both transcription and acoustic analysis.
+    try:
+        trimmed, _, _ = trim_silence(str(raw_path), str(RECORDINGS_DIR / f"{session_id}.wav"))
+    except Exception:
+        trimmed = str(raw_path)
+    audio_path = Path(trimmed)
+    if audio_path != raw_path:  # a distinct trimmed file replaced the upload
+        raw_path.unlink(missing_ok=True)
 
     try:
         transcription = transcribe(str(audio_path))
@@ -319,6 +329,10 @@ def generate_ideal(
     session.generation_usage = usage.build(
         prov.name, eff_model, session.transcript, style_usage, audio_seconds
     )
+    try:
+        usage_log.log(session_id, session.generation_usage)
+    except Exception:
+        pass  # never let logging break generation
     db.save_session(session)
     return session
 

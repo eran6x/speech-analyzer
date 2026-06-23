@@ -5,3 +5,4 @@ __pycache__/
 *.pyc
 .dev/
 .venv/
+voice_generations.csv

@@ -54,3 +54,61 @@ def to_wav_file(src_path: str, dst_path: str, target_sr: int = TARGET_SR) -> Non
     """Decode any supported audio file and write it as a mono 16-bit WAV."""
     with open(dst_path, "wb") as f:
         f.write(to_wav_bytes(src_path, target_sr))
+
+
+def write_wav(samples: np.ndarray, sr: int, dst_path: str) -> None:
+    """Write a float32 [-1, 1] mono array as a 16-bit PCM WAV."""
+    pcm = (np.clip(samples, -1.0, 1.0) * 32767.0).astype("<i2")
+    with wave.open(dst_path, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(sr)
+        w.writeframes(pcm.tobytes())
+
+
+# Silence-trim tuning.
+TRIM_STORE_SR = 48000   # preserve fidelity (opus is 48k); analysis downsamples
+LEAD_KEEP_SEC = 0.10    # keep a short run-in before the first speech
+TAIL_KEEP_SEC = 0.10    # keep a short tail after the last speech
+MIN_TRIM_SEC = 0.20     # only trim an end if its silence exceeds this
+
+
+def _speech_bounds(samples: np.ndarray, sr: int) -> tuple[int, int]:
+    """(first, last+1) sample indices of speech, via short-time RMS threshold."""
+    win = max(1, int(0.02 * sr))  # 20 ms frames
+    nf = len(samples) // win
+    if nf == 0:
+        return 0, len(samples)
+    frames = samples[: nf * win].reshape(nf, win)
+    rms = np.sqrt((frames ** 2).mean(axis=1))
+    peak = float(rms.max()) if rms.size else 0.0
+    threshold = max(peak * 0.10, 1e-3)  # 10% of peak, with a noise floor
+    voiced = np.where(rms > threshold)[0]
+    if voiced.size == 0:
+        return 0, len(samples)
+    start = int(voiced[0] * win)
+    end = int(min(len(samples), (voiced[-1] + 1) * win))
+    return start, end
+
+
+def trim_silence(src_path: str, dst_path: str,
+                 store_sr: int = TRIM_STORE_SR) -> tuple[str, float, float]:
+    """Trim silence before the first and after the last speech.
+
+    Returns (path_to_use, lead_trimmed_sec, tail_trimmed_sec). Writes a trimmed
+    WAV to dst_path when either end has meaningful silence; otherwise returns the
+    original src_path unchanged.
+    """
+    samples, sr = load_waveform(src_path, store_sr)
+    n = samples.size
+    if n == 0:
+        return src_path, 0.0, 0.0
+    start, end = _speech_bounds(samples, sr)
+    new_start = max(0, start - int(LEAD_KEEP_SEC * sr))
+    new_end = min(n, end + int(TAIL_KEEP_SEC * sr))
+    lead_trim = new_start / sr
+    tail_trim = (n - new_end) / sr
+    if lead_trim < MIN_TRIM_SEC and tail_trim < MIN_TRIM_SEC:
+        return src_path, 0.0, 0.0
+    write_wav(samples[new_start:new_end], sr, dst_path)
+    return dst_path, round(lead_trim, 2), round(tail_trim, 2)
