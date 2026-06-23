@@ -45,8 +45,16 @@ async function detail(res, fallback) {
   }
 }
 
-export async function generateIdeal(sessionId) {
-  const res = await fetch(`${API_BASE}/sessions/${sessionId}/ideal`, { method: "POST" });
+export async function generateIdeal(sessionId, opts = {}) {
+  const params = new URLSearchParams();
+  if (opts.provider) params.set("provider", opts.provider);
+  if (opts.model) params.set("model", opts.model);
+  if (opts.voice) params.set("voice", opts.voice);
+  const qs = params.toString();
+  const res = await fetch(
+    `${API_BASE}/sessions/${sessionId}/ideal${qs ? `?${qs}` : ""}`,
+    { method: "POST" }
+  );
   if (!res.ok) throw new Error(await detail(res, `Generation failed (${res.status})`));
   return res.json();
 }

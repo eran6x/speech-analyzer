@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { DIMENSION_COLORS, METRIC_DIMENSION } from "../colors.js";
 import { audioUrl, generateIdeal, idealAudioUrl, updateTranscript } from "../api.js";
+import { loadSettings } from "../settings.js";
 import WaveformPlayer from "./WaveformPlayer.jsx";
 
 export default function Results({ session }) {
   const [ideal, setIdeal] = useState(null); // session updated with ideal audio
   const [genStatus, setGenStatus] = useState("idle"); // idle | loading | error
   const [genError, setGenError] = useState(null);
+  const [genProvider, setGenProvider] = useState(loadSettings().ttsProvider || "");
+  const [genCount, setGenCount] = useState(0); // cache-bust the ideal audio url
   const [transcriptText, setTranscriptText] = useState(session?.transcript || "");
   const [savedTranscript, setSavedTranscript] = useState(session?.transcript || "");
   const [tStatus, setTStatus] = useState("idle"); // idle | saving | error
@@ -19,7 +22,14 @@ export default function Results({ session }) {
     setGenStatus("loading");
     setGenError(null);
     try {
-      setIdeal(await generateIdeal(session.id));
+      const s = loadSettings();
+      const updated = await generateIdeal(session.id, {
+        provider: genProvider, // quick-switch overrides the Settings default
+        model: s.ttsModel,
+        voice: s.ttsVoice,
+      });
+      setIdeal(updated);
+      setGenCount((c) => c + 1);
       setGenStatus("idle");
     } catch (e) {
       setGenError(e.message);
@@ -64,7 +74,7 @@ export default function Results({ session }) {
         </div>
       )}
 
-      {session.id && (session.audio_path || ideal) && (
+      {session.id && (
         <details className="collapsible" open>
           <summary>Playback</summary>
 
@@ -78,26 +88,42 @@ export default function Results({ session }) {
             </>
           )}
 
-          {ideal?.ideal_audio_path ? (
+          <div className="ideal-controls">
+            <select
+              value={genProvider}
+              onChange={(e) => setGenProvider(e.target.value)}
+              disabled={genStatus === "loading"}
+              title="Voice engine for this generation"
+            >
+              <option value="">Default</option>
+              <option value="openai">OpenAI (preset voice)</option>
+              <option value="local">Local (your voice)</option>
+              <option value="elevenlabs">ElevenLabs</option>
+            </select>
+            <button
+              className="primary-btn"
+              onClick={makeIdeal}
+              disabled={genStatus === "loading"}
+            >
+              {genStatus === "loading"
+                ? "Generating…"
+                : ideal
+                  ? "↻ Regenerate"
+                  : "✨ Hear ideal delivery"}
+            </button>
+          </div>
+          {genError && <p className="error">{genError}</p>}
+
+          {ideal?.ideal_audio_path && (
             <div className="ideal-block">
-              <p className="playback-label">Ideal delivery (your voice)</p>
+              <p className="playback-label">Ideal delivery</p>
               {ideal.delivery_style && (
                 <p className="ideal-style">🎯 {ideal.delivery_style}</p>
               )}
-              <WaveformPlayer url={idealAudioUrl(session.id)} />
-            </div>
-          ) : (
-            <div className="ideal-cta">
-              <button
-                className="primary-btn"
-                onClick={makeIdeal}
-                disabled={genStatus === "loading"}
-              >
-                {genStatus === "loading"
-                  ? "Generating…"
-                  : "✨ Hear ideal delivery"}
-              </button>
-              {genError && <p className="error">{genError}</p>}
+              {ideal.generation_usage && (
+                <p className="ideal-usage">{fmtUsage(ideal.generation_usage)}</p>
+              )}
+              <WaveformPlayer url={`${idealAudioUrl(session.id)}?n=${genCount}`} />
             </div>
           )}
         </details>
@@ -150,6 +176,17 @@ export default function Results({ session }) {
       </details>
     </div>
   );
+}
+
+function fmtUsage(u) {
+  const tail = `${u.provider}${u.model ? `/${u.model}` : ""}`;
+  const cost = u.total_cost_usd != null ? `~$${u.total_cost_usd.toFixed(4)}` : "plan-dependent";
+  const bits = [];
+  if (u.style_input_tokens != null)
+    bits.push(`style ${u.style_input_tokens}→${u.style_output_tokens} tok`);
+  if (u.tts_audio_seconds != null) bits.push(`${u.tts_audio_seconds}s audio`);
+  else if (u.tts_characters != null) bits.push(`${u.tts_characters} chars`);
+  return `Est. cost ${cost}${bits.length ? ` · ${bits.join(" · ")}` : ""} · ${tail}`;
 }
 
 const fmt = (v) => (v == null ? "—" : v);

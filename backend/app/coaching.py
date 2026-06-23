@@ -200,14 +200,17 @@ def _fallback_delivery_style(metrics: Metrics) -> str:
     return ", ".join(bits) + "."
 
 
-def generate_delivery_style(transcript: str, metrics: Metrics, scores: Scores) -> str:
+def generate_delivery_style(
+    transcript: str, metrics: Metrics, scores: Scores
+) -> tuple[str, Optional[dict]]:
     """Short vocal-direction instruction for the ideal delivery.
 
-    Always returns a usable string: a metric-derived fallback when there's no
-    API key or the call fails, so audio generation works offline.
+    Returns (instruction, usage) where usage is the Claude token counts
+    ({"input_tokens", "output_tokens"}) or None when the metric-derived fallback
+    is used (no API key / call failed), so audio generation works offline.
     """
     if not os.getenv("ANTHROPIC_API_KEY"):
-        return _fallback_delivery_style(metrics)
+        return _fallback_delivery_style(metrics), None
     try:
         import anthropic
 
@@ -229,6 +232,12 @@ def generate_delivery_style(transcript: str, metrics: Metrics, scores: Scores) -
             ],
         )
         text = "".join(b.text for b in response.content if b.type == "text").strip()
-        return text or _fallback_delivery_style(metrics)
+        if not text:
+            return _fallback_delivery_style(metrics), None
+        usage = {
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+        }
+        return text, usage
     except Exception:
-        return _fallback_delivery_style(metrics)
+        return _fallback_delivery_style(metrics), None

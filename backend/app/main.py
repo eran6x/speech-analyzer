@@ -18,9 +18,9 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
-from . import coaching, db, stats, tts
+from . import coaching, db, stats, tts, usage
 from .acoustic import compute_metrics
-from .audio_io import to_wav_bytes, to_wav_file
+from .audio_io import load_waveform, to_wav_bytes, to_wav_file
 from .models import Session, Stats, Topic, TranscriptUpdate
 from .scoring import CONFIG as SCORING_CONFIG, compute_scores
 from .topics import CATEGORIES, suggest_topic
@@ -239,41 +239,57 @@ def delete_voice() -> dict:
 
 
 @app.post("/sessions/{session_id}/ideal", response_model=Session)
-def generate_ideal(session_id: str) -> Session:
+def generate_ideal(
+    session_id: str,
+    provider: str | None = None,
+    model: str | None = None,
+    voice: str | None = None,
+) -> Session:
     session = db.get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
     if not session.transcript.strip():
         raise HTTPException(status_code=400, detail="No transcript to synthesize")
 
-    provider = tts.get_provider()
-    if provider is None or not provider.available():
-        detail = "Voice TTS engine unavailable. Install requirements-tts.txt and set TTS_PROVIDER=local."
-        reason = getattr(provider, "reason", None)
+    prov = tts.get_provider(provider)
+    if prov is None:
+        if provider:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown TTS provider '{provider}'. Options: {', '.join(tts.PROVIDERS)}.",
+            )
+        raise HTTPException(status_code=503, detail="No TTS provider configured (set TTS_PROVIDER).")
+    if not prov.available():
+        detail = f"TTS provider '{prov.name}' is unavailable — check its API key / install (requirements-tts.txt for local)."
+        reason = getattr(prov, "reason", None)
         if reason:
             detail += f" ({reason})"
         raise HTTPException(status_code=503, detail=detail)
 
-    ref_path, is_temp = _resolve_voice_ref(session)
-    if ref_path is None:
-        raise HTTPException(
-            status_code=400,
-            detail="No voice reference: enroll a voice sample in Settings, or enable 'keep recordings'.",
-        )
+    # Cloning providers need a reference clip; preset-voice providers (OpenAI) don't.
+    ref_path, is_temp = (None, False)
+    if getattr(prov, "needs_voice_ref", True):
+        ref_path, is_temp = _resolve_voice_ref(session)
+        if ref_path is None:
+            raise HTTPException(
+                status_code=400,
+                detail="No voice reference: enroll a voice sample in Settings, or enable 'keep recordings'.",
+            )
 
     try:
-        style_text = coaching.generate_delivery_style(
+        style_text, style_usage = coaching.generate_delivery_style(
             session.transcript, session.metrics, session.scores
         )
         pace = SCORING_CONFIG["pace"]
         target_wpm = (pace["ideal_min"] + pace["ideal_max"]) / 2
         user_wpm = session.metrics.wpm or target_wpm
         speed = max(0.7, min(1.3, target_wpm / user_wpm)) if user_wpm > 0 else 1.0
-        wav = provider.synthesize(
-            session.transcript,
-            ref_path,
-            {"instruction": style_text, "target_wpm": target_wpm, "speed": round(speed, 3)},
-        )
+        style = {"instruction": style_text, "target_wpm": target_wpm, "speed": round(speed, 3)}
+        if model:
+            style["model"] = model
+        if voice:
+            style["voice"] = voice
+        wav = prov.synthesize(session.transcript, ref_path, style)
     except HTTPException:
         raise
     except NotImplementedError as exc:
@@ -286,8 +302,23 @@ def generate_ideal(session_id: str) -> Session:
 
     ideal_path = RECORDINGS_DIR / f"{session_id}_ideal.wav"
     ideal_path.write_bytes(wav)
+
+    # Cost/usage accounting. Decode the result for a robust duration (OpenAI's
+    # WAV header reports a bogus length).
+    try:
+        samples, sr = load_waveform(str(ideal_path))
+        audio_seconds = len(samples) / sr if sr else 0.0
+    except Exception:
+        audio_seconds = 0.0
+    eff_model = model or (
+        os.getenv("OPENAI_TTS_MODEL", "gpt-4o-mini-tts") if prov.name == "openai" else None
+    )
+
     session.ideal_audio_path = str(ideal_path)
     session.delivery_style = style_text
+    session.generation_usage = usage.build(
+        prov.name, eff_model, session.transcript, style_usage, audio_seconds
+    )
     db.save_session(session)
     return session
 

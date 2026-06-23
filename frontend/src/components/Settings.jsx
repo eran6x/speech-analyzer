@@ -100,6 +100,43 @@ export default function Settings() {
         </Field>
       </Section>
 
+      <Section title="Voice generation">
+        <p className="settings-note">
+          Which engine produces the "ideal delivery" audio. <strong>Local</strong>{" "}
+          and <strong>ElevenLabs</strong> clone your enrolled voice;{" "}
+          <strong>OpenAI</strong> uses a preset voice (not your own) but follows
+          the delivery style. Leave on Default to use the server's configured
+          provider.
+        </p>
+        <Field label="Provider">
+          <select
+            value={settings.ttsProvider}
+            onChange={(e) => update("ttsProvider", e.target.value)}
+          >
+            <option value="">Default (server)</option>
+            <option value="local">Local (XTTS, your voice)</option>
+            <option value="elevenlabs">ElevenLabs (your voice)</option>
+            <option value="openai">OpenAI (preset voice)</option>
+          </select>
+        </Field>
+        <Field label="Model">
+          <input
+            type="text"
+            value={settings.ttsModel}
+            placeholder="provider default (e.g. gpt-4o-mini-tts)"
+            onChange={(e) => update("ttsModel", e.target.value)}
+          />
+        </Field>
+        <Field label="Voice">
+          <input
+            type="text"
+            value={settings.ttsVoice}
+            placeholder="OpenAI: alloy/onyx/nova… · ElevenLabs: voice id"
+            onChange={(e) => update("ttsVoice", e.target.value)}
+          />
+        </Field>
+      </Section>
+
       <Section title="Voice">
         <p className="settings-note">
           Record a short, clean ~15s sample (read any neutral passage). It clones

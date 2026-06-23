@@ -275,6 +275,29 @@ header h1 {
   margin-top: 1rem;
 }
 
+.ideal-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.ideal-controls select {
+  background: var(--bg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 0.5rem 0.6rem;
+}
+
+.ideal-usage {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0.25rem 0 0.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .waveform-canvas {
   background: rgba(255, 255, 255, 0.03);
   border-radius: 8px;
@@ -462,6 +485,15 @@ header h1 {
 .settings-field input[type="checkbox"] {
   width: 18px;
   height: 18px;
+}
+
+.settings-field select {
+  background: var(--bg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 0.4rem 0.6rem;
+  min-width: 12rem;
 }
 
 .settings-control {

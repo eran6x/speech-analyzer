@@ -59,6 +59,27 @@ class Annotation(BaseModel):
     end: float
 
 
+class GenerationUsage(BaseModel):
+    """Token/cost accounting for one ideal-delivery generation.
+
+    Style tokens (Claude) are exact; TTS cost is an *estimate* — OpenAI's speech
+    endpoint returns no usage, so it's derived from characters + audio length.
+    """
+
+    provider: str
+    model: Optional[str] = None
+    # Delivery-style LLM (Claude) — exact from the Messages API usage.
+    style_input_tokens: Optional[int] = None
+    style_output_tokens: Optional[int] = None
+    style_cost_usd: Optional[float] = None
+    # Text-to-speech — estimated.
+    tts_characters: Optional[int] = None
+    tts_audio_seconds: Optional[float] = None
+    tts_cost_usd: Optional[float] = None  # None = plan-dependent (ElevenLabs)
+    total_cost_usd: Optional[float] = None
+    estimated: bool = True
+
+
 class Session(BaseModel):
     id: str
     timestamp: str
@@ -74,6 +95,7 @@ class Session(BaseModel):
     # Phase 6: generated "ideal delivery" audio in the user's cloned voice.
     ideal_audio_path: Optional[str] = None
     delivery_style: Optional[str] = None
+    generation_usage: Optional[GenerationUsage] = None
 
 
 class TranscriptUpdate(BaseModel):

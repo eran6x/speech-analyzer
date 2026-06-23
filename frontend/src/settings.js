@@ -10,6 +10,10 @@ export const DEFAULTS = {
   targetPaceWpm: 145,
   goalOverall: 80, // target average overall score
   goalWeekly: 3, // target sessions per week
+  // Voice generation ("ideal delivery"). Empty = backend env default.
+  ttsProvider: "", // "" | local | elevenlabs | openai
+  ttsModel: "",
+  ttsVoice: "",
 };
 
 export function loadSettings() {

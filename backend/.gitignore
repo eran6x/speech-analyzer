@@ -3,3 +3,5 @@
 recordings/
 __pycache__/
 *.pyc
+.dev/
+.venv/

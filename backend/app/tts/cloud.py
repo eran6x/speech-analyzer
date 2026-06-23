@@ -28,6 +28,11 @@ DEFAULT_MODEL = "eleven_multilingual_v2"
 class CloudTTS(TTSProvider):
     name = "elevenlabs"
 
+    @property
+    def needs_voice_ref(self) -> bool:
+        # A fixed voice id skips cloning, so no reference clip is needed.
+        return not bool(os.getenv("ELEVENLABS_VOICE_ID"))
+
     def available(self) -> bool:
         return bool(os.getenv("ELEVENLABS_API_KEY"))
 

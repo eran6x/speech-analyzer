@@ -15,6 +15,9 @@ from typing import Optional
 
 class TTSProvider(ABC):
     name: str = "base"
+    # Whether synthesis needs a reference clip of the user's voice (cloning
+    # providers do; preset-voice providers like OpenAI don't).
+    needs_voice_ref: bool = True
 
     @abstractmethod
     def available(self) -> bool:
