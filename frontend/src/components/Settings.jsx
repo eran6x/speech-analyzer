@@ -4,6 +4,7 @@ import {
   deleteRecordings,
   deleteVoice,
   enrollVoice,
+  fetchProfiles,
   getVoice,
 } from "../api.js";
 import { loadSettings, saveSettings } from "../settings.js";
@@ -16,10 +17,15 @@ export default function Settings() {
   const [voiceEnrolled, setVoiceEnrolled] = useState(false);
   const [voiceMsg, setVoiceMsg] = useState(null);
   const [enrolling, setEnrolling] = useState(false);
+  const [profiles, setProfiles] = useState([]);
 
   useEffect(() => {
     getVoice().then((v) => setVoiceEnrolled(v.enrolled)).catch(() => {});
+    fetchProfiles().then(setProfiles).catch(() => {});
   }, []);
+
+  const speakers = profiles.filter((p) => p.kind === "speaker");
+  const styles = profiles.filter((p) => p.kind === "style");
 
   async function handleEnroll(blob) {
     setEnrolling(true);
@@ -97,6 +103,55 @@ export default function Settings() {
             placeholder="you@example.com"
             onChange={(e) => update("email", e.target.value)}
           />
+        </Field>
+      </Section>
+
+      <Section title="Coaching">
+        <p className="settings-note">
+          Steer what coaching optimizes for. Picking a speaker or style also
+          scores you against that target's bands ("scored vs …").
+        </p>
+        <Field label="Target">
+          <select
+            value={settings.coachingTarget}
+            onChange={(e) => update("coachingTarget", e.target.value)}
+          >
+            <option value="">Balanced (default)</option>
+            {styles.length > 0 && (
+              <optgroup label="Styles">
+                {styles.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </optgroup>
+            )}
+            {speakers.length > 0 && (
+              <optgroup label="Speakers">
+                {speakers.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </Field>
+        <Field label="Tone">
+          <select
+            value={settings.coachingTone}
+            onChange={(e) => update("coachingTone", e.target.value)}
+          >
+            <option value="">Balanced</option>
+            <option value="encouraging">Encouraging</option>
+            <option value="blunt">Blunt</option>
+          </select>
+        </Field>
+        <Field label="Depth">
+          <select
+            value={settings.coachingDepth}
+            onChange={(e) => update("coachingDepth", e.target.value)}
+          >
+            <option value="">Standard</option>
+            <option value="brief">Brief</option>
+            <option value="detailed">Detailed</option>
+          </select>
         </Field>
       </Section>
 

@@ -10,6 +10,7 @@ The numbers say *what*; the coaching layer says *why and how to fix it*.
 
 from __future__ import annotations
 
+import copy
 from statistics import mean
 from typing import Optional
 
@@ -68,24 +69,54 @@ def _band_score(value: float, floor_low: float, ideal_min: float,
     return _clamp(MIN_SCORE + frac * (MAX_SCORE - MIN_SCORE))
 
 
-def score_pace(wpm: float) -> int:
-    c = CONFIG["pace"]
+def _reband(dim: dict, lo: float, hi: float) -> dict:
+    """Recentre a band-scored dimension on [lo, hi], reusing its ramp offsets."""
+    k_low = dim["ideal_min"] - dim["floor_low"]
+    k_high = dim["floor_high"] - dim["ideal_max"]
+    return {
+        **dim,
+        "ideal_min": lo,
+        "ideal_max": hi,
+        "floor_low": max(0.0, lo - k_low),
+        "floor_high": hi + k_high,
+    }
+
+
+def _effective_config(target_bands: Optional[dict]) -> dict:
+    """CONFIG with pace/pauses/pitch bands overridden by a target (if any)."""
+    if not target_bands:
+        return CONFIG
+    cfg = copy.deepcopy(CONFIG)
+    if "wpm" in target_bands:
+        cfg["pace"] = _reband(cfg["pace"], *target_bands["wpm"])
+    if "pauses_per_min" in target_bands:
+        cfg["pauses"] = _reband(cfg["pauses"], *target_bands["pauses_per_min"])
+    if "pitch_variability_hz" in target_bands:
+        cfg["confidence"]["pitch_var"] = _reband(
+            cfg["confidence"]["pitch_var"], *target_bands["pitch_variability_hz"]
+        )
+    return cfg
+
+
+def score_pace(wpm: float, cfg: dict = CONFIG) -> int:
+    c = cfg["pace"]
     return _band_score(wpm, c["floor_low"], c["ideal_min"], c["ideal_max"], c["floor_high"])
 
 
-def score_pauses(pause_count: int, duration_sec: float, filler_density: float) -> int:
-    c = CONFIG["pauses"]
+def score_pauses(pause_count: int, duration_sec: float, filler_density: float,
+                 cfg: dict = CONFIG) -> int:
+    c = cfg["pauses"]
     per_min = (pause_count / duration_sec * 60.0) if duration_sec > 0 else 0.0
     base = _band_score(per_min, c["floor_low"], c["ideal_min"], c["ideal_max"], c["floor_high"])
     penalty = filler_density * c["filler_penalty_per_density"]
     return _clamp(base - penalty)
 
 
-def score_confidence(metrics: Metrics) -> Optional[int]:
+def score_confidence(metrics: Metrics, cfg: dict = CONFIG) -> Optional[int]:
     # Requires acoustic features; without them confidence is undefined.
     if metrics.pitch_variability is None or metrics.mean_intensity_db is None:
         return None
-    c = CONFIG["confidence"]
+    c = cfg["confidence"]
 
     pv = c["pitch_var"]
     pitch_score = _band_score(
@@ -121,13 +152,17 @@ def score_fluency(metrics: Metrics) -> int:
     return _clamp(MAX_SCORE - penalty)
 
 
-def compute_scores(metrics: Metrics, duration_sec: float) -> Scores:
-    pace = score_pace(metrics.wpm)
-    pauses = score_pauses(metrics.pause_count, duration_sec, metrics.filler_density or 0.0)
-    confidence = score_confidence(metrics)
+def compute_scores(metrics: Metrics, duration_sec: float,
+                   target_bands: Optional[dict] = None) -> Scores:
+    # When a target supplies bands, score against those instead of the generic
+    # ideals (target-relative scoring); fluency stays generic.
+    cfg = _effective_config(target_bands)
+    pace = score_pace(metrics.wpm, cfg)
+    pauses = score_pauses(metrics.pause_count, duration_sec, metrics.filler_density or 0.0, cfg)
+    confidence = score_confidence(metrics, cfg)
     fluency = score_fluency(metrics)
 
-    weights = CONFIG["weights"]
+    weights = cfg["weights"]
     dims = {"pace": pace, "pauses": pauses, "confidence": confidence, "fluency": fluency}
     available = {k: v for k, v in dims.items() if v is not None}
     total_weight = sum(weights[k] for k in available)

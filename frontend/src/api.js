@@ -17,6 +17,26 @@ export async function fetchCategories() {
   return res.json();
 }
 
+export async function fetchProfiles() {
+  const res = await fetch(`${API_BASE}/profiles`);
+  if (!res.ok) throw new Error(`Failed to fetch profiles (${res.status})`);
+  return res.json();
+}
+
+export async function recoach(sessionId, { target = "", tone = "", depth = "" } = {}) {
+  const params = new URLSearchParams();
+  if (target) params.set("target", target);
+  if (tone) params.set("tone", tone);
+  if (depth) params.set("depth", depth);
+  const qs = params.toString();
+  const res = await fetch(
+    `${API_BASE}/sessions/${sessionId}/coach${qs ? `?${qs}` : ""}`,
+    { method: "POST" }
+  );
+  if (!res.ok) throw new Error(`Re-coach failed (${res.status})`);
+  return res.json();
+}
+
 export async function fetchSessions() {
   const res = await fetch(`${API_BASE}/sessions`);
   if (!res.ok) throw new Error(`Failed to fetch sessions (${res.status})`);
@@ -86,6 +106,9 @@ export async function analyze(audioBlob, topic, opts = {}) {
   form.append("topic_prompt", topic.prompt);
   form.append("enable_coaching", opts.coaching === false ? "false" : "true");
   form.append("keep_recording", opts.keepRecording === false ? "false" : "true");
+  if (opts.coachingTarget) form.append("coaching_target", opts.coachingTarget);
+  if (opts.coachingTone) form.append("coaching_tone", opts.coachingTone);
+  if (opts.coachingDepth) form.append("coaching_depth", opts.coachingDepth);
 
   const res = await fetch(`${API_BASE}/analyze`, {
     method: "POST",

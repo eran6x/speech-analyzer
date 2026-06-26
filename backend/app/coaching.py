@@ -14,25 +14,71 @@ import re
 from statistics import mean
 from typing import Optional
 
+from . import profiles
 from .models import Metrics, Scores, Session, Topic
 
 # Current Claude model (see Speech_analyer_plan.md reference docs).
 MODEL = "claude-opus-4-8"
 
-SYSTEM = (
-    "You are a concise, encouraging speech coach for a sales engineer who "
-    "practices presentations and customer conversations daily. You are given "
-    "acoustic and transcript metrics plus 1-100 scores for one ~30-60s clip. "
-    "Acoustic delivery (pace, pauses, pitch variation, volume, confidence) is "
-    "the priority; transcript content (fillers, hedging) is secondary.\n\n"
-    "Respond in markdown with exactly these four short sections:\n"
-    "**What went well** — one or two specifics, tied to the numbers.\n"
-    "**What to fix** — one or two specifics, tied to the lowest scores.\n"
-    "**Next time** — one concrete thing to try on the next recording.\n"
-    "**Drill** — one targeted exercise for the lowest-scoring dimension.\n\n"
-    "Be specific and reference actual metric values. Keep the whole reply under "
-    "180 words. Do not invent metrics you weren't given."
+CRAFT_SYSTEM = (
+    "You are an expert speech-delivery coach for a sales engineer. You receive "
+    "acoustic + transcript signals for one ~30-60s clip and coach DELIVERY "
+    "CRAFT, not metric worship. Cover, where relevant: emphasis and word stress, "
+    "vocal variety (pitch and energy), pacing FOR EFFECT, and PAUSES AS A TOOL "
+    "— coach where pauses should land (before a key point, after a question), "
+    "never just 'use fewer pauses'. Also structure/arc (hook → point → support "
+    "→ close), the opening line, the close, and energy/tone. Reference the "
+    "signals you're given, but talk about craft. Do NOT default to 'speak "
+    "faster' or 'reduce pauses' unless the signals clearly show the speaker is "
+    "rushing or stalling and that's the single highest-leverage fix.\n\n"
+    "Respond in markdown with these sections:\n"
+    "**What landed** — specific delivery strengths.\n"
+    "**Sharpen the delivery** — the highest-leverage craft fixes.\n"
+    "**Next time** — one concrete thing to try on the next take.\n"
+    "**Drill** — one targeted exercise.\n\n"
+    "Do not invent signals you weren't given."
 )
+
+
+def _tone_directive(tone: Optional[str]) -> str:
+    return {
+        "encouraging": "Tone: warm and encouraging; lead with what's working.",
+        "blunt": "Tone: direct and blunt; skip pleasantries, be candid about weaknesses.",
+    }.get(tone or "", "Tone: balanced and constructive.")
+
+
+def _depth_directive(depth: Optional[str]) -> str:
+    return {
+        "brief": "Keep it tight — under ~110 words total.",
+        "detailed": "Be thorough — up to ~300 words; a second specific per section is fine.",
+    }.get(depth or "", "Keep the whole reply under ~180 words.")
+
+
+def _signals_summary(annotations) -> str:
+    """Compact timing read-out (pause placement, fillers, hedges, upspeak)."""
+    if not annotations:
+        return "none captured"
+    by: dict[str, list] = {}
+    for a in annotations:
+        by.setdefault(a.kind, []).append(a)
+    parts = []
+    for kind in ("pause", "filler", "hedge", "upspeak"):
+        items = by.get(kind, [])
+        if not items:
+            continue
+        if kind == "pause":
+            spans = ", ".join(f"{a.start:.1f}-{a.end:.1f}s" for a in items[:8])
+        else:
+            spans = ", ".join(f"'{a.label}'@{a.start:.1f}s" for a in items[:8])
+        parts.append(f"{kind} ({len(items)}): {spans}")
+    return "; ".join(parts) or "clean"
+
+
+def _open_close(transcript: str) -> tuple[str, str]:
+    sents = [s for s in re.split(r"(?<=[.!?])\s+", (transcript or "").strip()) if s]
+    if not sents:
+        return "", ""
+    return sents[0], sents[-1]
 
 
 def _history_summary(history: list[Session]) -> str:
@@ -49,22 +95,31 @@ def _history_summary(history: list[Session]) -> str:
     return "\n".join(lines)
 
 
-def _build_prompt(topic: Topic, transcript: str, metrics: Metrics,
-                  scores: Scores, history: list[Session]) -> str:
+def _build_prompt(topic: Topic, transcript: str, metrics: Metrics, scores: Scores,
+                  history: list[Session], target: Optional[str], annotations) -> str:
+    opening, closing = _open_close(transcript)
+    target_block = profiles.prompt_block(target)
     return (
-        f"Topic ({topic.category}): {topic.prompt}\n\n"
+        (f"{target_block}\n\n" if target_block else "")
+        + f"Topic ({topic.category}): {topic.prompt}\n\n"
         f"Scores (1-100): {scores.model_dump(exclude_none=True)}\n"
-        f"Metrics: {metrics.model_dump(exclude_none=True)}\n\n"
+        f"Metrics: {metrics.model_dump(exclude_none=True)}\n"
+        f"Timing signals: {_signals_summary(annotations)}\n"
+        f"Opening line: \"{opening}\"\n"
+        f"Closing line: \"{closing}\"\n\n"
         f"Recent sessions:\n{_history_summary(history)}\n\n"
         f"Transcript:\n\"\"\"\n{transcript or '(no speech detected)'}\n\"\"\""
     )
 
 
 def generate_feedback(topic: Topic, transcript: str, metrics: Metrics,
-                      scores: Scores, history: list[Session]) -> Optional[str]:
+                      scores: Scores, history: list[Session],
+                      target: Optional[str] = None, tone: Optional[str] = None,
+                      depth: Optional[str] = None, annotations=None) -> Optional[str]:
     if not os.getenv("ANTHROPIC_API_KEY"):
         return None
 
+    system = f"{CRAFT_SYSTEM}\n\n{_tone_directive(tone)} {_depth_directive(depth)}"
     try:
         import anthropic
 
@@ -76,11 +131,13 @@ def generate_feedback(topic: Topic, transcript: str, metrics: Metrics,
             # output_config isn't a typed kwarg in this SDK version; pass it
             # through extra_body so "effort" reaches the API regardless.
             extra_body={"output_config": {"effort": "low"}},  # keep coaching snappy
-            system=SYSTEM,
+            system=system,
             messages=[
                 {
                     "role": "user",
-                    "content": _build_prompt(topic, transcript, metrics, scores, history),
+                    "content": _build_prompt(
+                        topic, transcript, metrics, scores, history, target, annotations
+                    ),
                 }
             ],
         )
@@ -201,16 +258,18 @@ def _fallback_delivery_style(metrics: Metrics) -> str:
 
 
 def generate_delivery_style(
-    transcript: str, metrics: Metrics, scores: Scores
+    transcript: str, metrics: Metrics, scores: Scores, target: Optional[str] = None
 ) -> tuple[str, Optional[dict]]:
     """Short vocal-direction instruction for the ideal delivery.
 
     Returns (instruction, usage) where usage is the Claude token counts
     ({"input_tokens", "output_tokens"}) or None when the metric-derived fallback
     is used (no API key / call failed), so audio generation works offline.
+    When a target is set, the instruction emulates that style.
     """
     if not os.getenv("ANTHROPIC_API_KEY"):
         return _fallback_delivery_style(metrics), None
+    target_block = profiles.prompt_block(target)
     try:
         import anthropic
 
@@ -224,7 +283,8 @@ def generate_delivery_style(
                 {
                     "role": "user",
                     "content": (
-                        f"Scores: {scores.model_dump(exclude_none=True)}\n"
+                        (f"{target_block}\n" if target_block else "")
+                        + f"Scores: {scores.model_dump(exclude_none=True)}\n"
                         f"Metrics: {metrics.model_dump(exclude_none=True)}\n"
                         f"Transcript:\n{transcript}"
                     ),

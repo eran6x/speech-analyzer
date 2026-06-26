@@ -18,10 +18,10 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
-from . import coaching, db, stats, tts, usage, usage_log
+from . import coaching, db, profiles, stats, tts, usage, usage_log
 from .acoustic import compute_metrics
 from .audio_io import load_waveform, to_wav_bytes, to_wav_file, trim_silence
-from .models import Session, Stats, Topic, TranscriptUpdate
+from .models import Session, Stats, TargetInfo, Topic, TranscriptUpdate
 from .scoring import CONFIG as SCORING_CONFIG, compute_scores
 from .topics import CATEGORIES, suggest_topic
 from .transcription import transcribe
@@ -81,6 +81,9 @@ async def analyze(
     topic_prompt: str = Form(...),
     enable_coaching: bool = Form(True),
     keep_recording: bool = Form(True),
+    coaching_target: str = Form(""),
+    coaching_tone: str = Form(""),
+    coaching_depth: str = Form(""),
 ) -> Session:
     session_id = str(uuid.uuid4())
 
@@ -105,13 +108,16 @@ async def analyze(
         raise HTTPException(status_code=500, detail=f"Transcription failed: {exc}")
 
     metrics, annotations = compute_metrics(transcription, str(audio_path))
-    scores = compute_scores(metrics, transcription.duration_sec)
+    target_bands = profiles.target_bands(coaching_target)
+    scores = compute_scores(metrics, transcription.duration_sec, target_bands)
 
     topic = Topic(category=topic_category, prompt=topic_prompt)
-    # Coaching is opt-out via Settings; pass recent history for context.
+    # Coaching is opt-out via Settings; pass recent history + target/tone/depth.
     feedback = (
         coaching.generate_feedback(
-            topic, transcription.text, metrics, scores, db.list_sessions()
+            topic, transcription.text, metrics, scores, db.list_sessions(),
+            target=coaching_target, tone=coaching_tone, depth=coaching_depth,
+            annotations=annotations,
         )
         if enable_coaching
         else None
@@ -136,7 +142,39 @@ async def analyze(
         feedback=feedback,
         audio_path=saved_audio_path,
         annotations=annotations,
+        coaching_target=coaching_target or None,
     )
+    db.save_session(session)
+    return session
+
+
+@app.get("/profiles", response_model=list[TargetInfo])
+def get_profiles() -> list[TargetInfo]:
+    return profiles.list_targets()
+
+
+@app.post("/sessions/{session_id}/coach", response_model=Session)
+def recoach(session_id: str, target: str = "", tone: str = "", depth: str = "") -> Session:
+    """Re-score and re-coach an existing session against a (new) target.
+
+    Pure function of the stored metrics + target bands (no audio needed), so the
+    user can experiment with targets/tone/depth without re-recording.
+    """
+    session = db.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session.scores = compute_scores(
+        session.metrics, session.duration_sec, profiles.target_bands(target)
+    )
+    feedback = coaching.generate_feedback(
+        session.topic, session.transcript, session.metrics, session.scores,
+        db.list_sessions(), target=target, tone=tone, depth=depth,
+        annotations=session.annotations,
+    )
+    if feedback is not None:
+        session.feedback = feedback
+    session.coaching_target = target or None
     db.save_session(session)
     return session
 
@@ -288,7 +326,7 @@ def generate_ideal(
 
     try:
         style_text, style_usage = coaching.generate_delivery_style(
-            session.transcript, session.metrics, session.scores
+            session.transcript, session.metrics, session.scores, session.coaching_target
         )
         pace = SCORING_CONFIG["pace"]
         target_wpm = (pace["ideal_min"] + pace["ideal_max"]) / 2

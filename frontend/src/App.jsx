@@ -61,6 +61,9 @@ export default function App() {
         await analyze(blob, topic, {
           coaching: s.coachingEnabled,
           keepRecording: s.keepRecordings,
+          coachingTarget: s.coachingTarget,
+          coachingTone: s.coachingTone,
+          coachingDepth: s.coachingDepth,
         })
       );
       setStatus("idle");

@@ -51,6 +51,13 @@ Settings with per-session fallback. The local engine needs
 [backend/requirements-tts.txt](backend/requirements-tts.txt) + a GPU. Design +
 cloud roadmap → [Phase6_plan.md](Phase6_plan.md).
 
+**Phase 7 (core landed):** delivery-craft coaching (emphasis, vocal variety,
+pacing-for-effect, structure) — steerable via **target style/goal, tone &
+depth**, and able to target curated **famous-speaker profiles** (Jobs, Obama,
+Brené Brown, Churchill, Oprah) with **target-relative scoring** and a
+you-vs-them comparison. Re-coach any session against a different target without
+re-recording. Design → [Phase7_plan.md](Phase7_plan.md).
+
 The scoring config (ideal ranges + weights) lives in one place:
 [backend/app/scoring.py](backend/app/scoring.py) → `CONFIG`.
 

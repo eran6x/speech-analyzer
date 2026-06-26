@@ -14,6 +14,10 @@ export const DEFAULTS = {
   ttsProvider: "", // "" | local | elevenlabs | openai
   ttsModel: "",
   ttsVoice: "",
+  // Coaching target/style. Empty target = Balanced (generic scoring).
+  coachingTarget: "",
+  coachingTone: "", // "" (balanced) | encouraging | blunt
+  coachingDepth: "", // "" (standard) | brief | detailed
 };
 
 export function loadSettings() {

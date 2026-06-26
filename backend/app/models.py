@@ -96,10 +96,29 @@ class Session(BaseModel):
     ideal_audio_path: Optional[str] = None
     delivery_style: Optional[str] = None
     generation_usage: Optional[GenerationUsage] = None
+    # Phase 7: coaching/scoring target (speaker profile or style goal) in effect.
+    coaching_target: Optional[str] = None
 
 
 class TranscriptUpdate(BaseModel):
     transcript: str
+
+
+class TargetBands(BaseModel):
+    """Target metric bands [lo, hi] for a coaching target (None = not steered)."""
+
+    wpm: Optional[list[float]] = None
+    pitch_variability_hz: Optional[list[float]] = None
+    pauses_per_min: Optional[list[float]] = None
+
+
+class TargetInfo(BaseModel):
+    id: str
+    name: str
+    kind: str  # speaker | style | balanced
+    blurb: str
+    bands: TargetBands
+    style_notes: str
 
 
 class Averages(BaseModel):
