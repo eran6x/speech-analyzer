@@ -4,13 +4,14 @@ import TopicCard from "./components/TopicCard.jsx";
 import ScenarioPicker from "./components/ScenarioPicker.jsx";
 import Results from "./components/Results.jsx";
 import Trends from "./components/Trends.jsx";
+import Compare from "./components/Compare.jsx";
 import Home from "./components/Home.jsx";
 import Help from "./components/Help.jsx";
 import Settings from "./components/Settings.jsx";
 import { analyze, fetchCategories, fetchTopic } from "./api.js";
 import { loadSettings } from "./settings.js";
 
-const TABS = ["Home", "Practice", "Trends", "Help", "Settings"];
+const TABS = ["Home", "Practice", "Trends", "Compare", "Help", "Settings"];
 
 export default function App() {
   const [view, setView] = useState("Home");
@@ -101,6 +102,7 @@ export default function App() {
 
       {view === "Home" && <Home onStart={() => setView("Practice")} />}
       {view === "Trends" && <Trends />}
+      {view === "Compare" && <Compare />}
       {view === "Help" && <Help />}
       {view === "Settings" && <Settings />}
 

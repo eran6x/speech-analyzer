@@ -470,6 +470,89 @@ header h1 {
   transition: width 0.3s ease;
 }
 
+/* Compare */
+.cmp-pickers {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.cmp-pickers select {
+  flex: 1;
+  min-width: 12rem;
+  background: var(--bg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 0.4rem 0.6rem;
+}
+
+.cmp-head,
+.cmp-row {
+  display: grid;
+  grid-template-columns: 7rem 1fr 1fr 4.5rem;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+.cmp-head {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 0.4rem;
+}
+
+.cmp-a,
+.cmp-b,
+.cmp-delta {
+  font-variant-numeric: tabular-nums;
+}
+
+.cmp-delta {
+  text-align: right;
+}
+
+.cmp-delta.up {
+  color: #63e6be;
+}
+
+.cmp-delta.down {
+  color: #ff8787;
+}
+
+.cmp-delta.neutral {
+  color: var(--muted);
+}
+
+.cmp-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.cmp-col h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.cmp-col p {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.section-subtitle {
+  margin: 1.25rem 0 0.5rem;
+}
+
 /* Help */
 .help-intro,
 .help-note {
