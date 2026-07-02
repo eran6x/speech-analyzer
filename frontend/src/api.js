@@ -17,6 +17,33 @@ export async function fetchCategories() {
   return res.json();
 }
 
+export async function fetchConversationQuestions(category, n = 3) {
+  const params = new URLSearchParams({ category: category || "small talk", n: String(n) });
+  const res = await fetch(`${API_BASE}/conversation/questions?${params}`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(`Failed to get questions (${res.status})`);
+  return res.json(); // { questions: [...] }
+}
+
+export async function analyzeConversation(blobs, opts = {}) {
+  const form = new FormData();
+  blobs.forEach((b, i) => form.append("audios", b, `answer_${i}.webm`));
+  form.append("category", opts.category || "custom");
+  form.append("questions", JSON.stringify(opts.questions || []));
+  form.append("enable_coaching", opts.coaching === false ? "false" : "true");
+  form.append("keep_recording", opts.keepRecording === false ? "false" : "true");
+  if (opts.coachingTarget) form.append("coaching_target", opts.coachingTarget);
+  if (opts.coachingTone) form.append("coaching_tone", opts.coachingTone);
+  if (opts.coachingDepth) form.append("coaching_depth", opts.coachingDepth);
+  const res = await fetch(`${API_BASE}/conversation/analyze`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) throw new Error(await detail(res, `Analysis failed (${res.status})`));
+  return res.json();
+}
+
 export async function fetchProfiles() {
   const res = await fetch(`${API_BASE}/profiles`);
   if (!res.ok) throw new Error(`Failed to fetch profiles (${res.status})`);

@@ -8,6 +8,7 @@ needs and later phases just enrich the responses.
 
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import uuid
@@ -20,8 +21,8 @@ from fastapi.responses import Response
 
 from . import coaching, db, profiles, stats, tts, usage, usage_log
 from .acoustic import compute_metrics
-from .audio_io import load_waveform, to_wav_bytes, to_wav_file, trim_silence
-from .models import Session, Stats, TargetInfo, Topic, TranscriptUpdate
+from .audio_io import concat_to_wav, load_waveform, to_wav_bytes, to_wav_file, trim_silence
+from .models import Session, Stats, TargetInfo, Topic, TranscriptUpdate, Turn
 from .scoring import CONFIG as SCORING_CONFIG, compute_scores
 from .topics import CATEGORIES, suggest_topic
 from .transcription import transcribe
@@ -63,6 +64,99 @@ def get_categories() -> list[str]:
     return CATEGORIES
 
 
+@app.post("/conversation/questions")
+def conversation_questions(category: str = "small talk", n: int = 3) -> dict:
+    """Generate N escalating questions on a theme, up front."""
+    return {"questions": coaching.generate_conversation_questions(category, n)}
+
+
+@app.post("/conversation/analyze", response_model=Session)
+async def analyze_conversation(
+    audios: list[UploadFile] = File(...),
+    category: str = Form(...),
+    questions: str = Form("[]"),
+    enable_coaching: bool = Form(True),
+    keep_recording: bool = Form(True),
+    coaching_target: str = Form(""),
+    coaching_tone: str = Form(""),
+    coaching_depth: str = Form(""),
+) -> Session:
+    """Analyze a conversation drill: one combined pass over all the answers."""
+    try:
+        q_list = json.loads(questions) if questions.strip() else []
+    except json.JSONDecodeError:
+        q_list = []
+    if not audios:
+        raise HTTPException(status_code=400, detail="No answers submitted")
+
+    session_id = str(uuid.uuid4())
+    raw_paths: list[Path] = []
+    trimmed_paths: list[Path] = []
+    turns: list[Turn] = []
+    try:
+        for i, up in enumerate(audios):
+            suffix = Path(up.filename or "").suffix or ".webm"
+            raw = RECORDINGS_DIR / f"{session_id}_ans{i}{suffix}"
+            raw.write_bytes(await up.read())
+            raw_paths.append(raw)
+            try:
+                trimmed, _, _ = trim_silence(
+                    str(raw), str(RECORDINGS_DIR / f"{session_id}_t{i}.wav")
+                )
+            except Exception:
+                trimmed = str(raw)
+            trimmed_paths.append(Path(trimmed))
+            answer = transcribe(trimmed).text
+            question = q_list[i] if i < len(q_list) else f"Question {i + 1}"
+            turns.append(Turn(question=question, answer=answer))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {exc}")
+
+    # Stitch the answers into one track for the usual combined analysis.
+    combined_path = RECORDINGS_DIR / f"{session_id}.wav"
+    concat_to_wav([str(p) for p in trimmed_paths], str(combined_path))
+    try:
+        transcription = transcribe(str(combined_path))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {exc}")
+
+    topic = Topic(category=category, prompt="Conversation drill")
+    metrics, annotations, scores, feedback, coaching_usage = _score_and_coach(
+        topic, transcription, combined_path,
+        enable_coaching=enable_coaching, coaching_target=coaching_target,
+        coaching_tone=coaching_tone, coaching_depth=coaching_depth,
+        conversation=turns,
+    )
+
+    if keep_recording:
+        saved_audio_path = str(combined_path)
+    else:
+        combined_path.unlink(missing_ok=True)
+        saved_audio_path = None
+    for p in raw_paths + trimmed_paths:  # drop per-answer temp clips
+        if Path(p) != combined_path:
+            Path(p).unlink(missing_ok=True)
+
+    session = Session(
+        id=session_id,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        topic=topic,
+        duration_sec=round(transcription.duration_sec, 2),
+        transcript=transcription.text,
+        metrics=metrics,
+        scores=scores,
+        feedback=feedback,
+        audio_path=saved_audio_path,
+        annotations=annotations,
+        exercise="conversation",
+        questions=q_list,
+        conversation=turns,
+    )
+    db.save_session(session)
+    usage_log.log_coaching(session_id, "conversation", coaching_usage)
+    return session
+
+
 @app.get("/topic", response_model=Topic)
 def get_topic(tailored: bool = False, category: str | None = None) -> Topic:
     # When requested, ask the coaching layer for a topic targeting the user's
@@ -72,6 +166,25 @@ def get_topic(tailored: bool = False, category: str | None = None) -> Topic:
         if topic is not None:
             return topic
     return suggest_topic(category)
+
+
+def _score_and_coach(topic, transcription, audio_path, *, enable_coaching,
+                     coaching_target, coaching_tone, coaching_depth, conversation=None):
+    """Shared pipeline tail: metrics → scores → coaching. Used by /analyze and
+    /conversation/analyze. Returns (metrics, annotations, scores, feedback)."""
+    metrics, annotations = compute_metrics(transcription, str(audio_path))
+    scores = compute_scores(
+        metrics, transcription.duration_sec, profiles.target_bands(coaching_target)
+    )
+    if enable_coaching:
+        feedback, coaching_usage = coaching.generate_feedback(
+            topic, transcription.text, metrics, scores, db.list_sessions(),
+            target=coaching_target, tone=coaching_tone, depth=coaching_depth,
+            annotations=annotations, conversation=conversation,
+        )
+    else:
+        feedback, coaching_usage = None, None
+    return metrics, annotations, scores, feedback, coaching_usage
 
 
 @app.post("/analyze", response_model=Session)
@@ -108,26 +221,16 @@ async def analyze(
     except Exception as exc:  # surface a clean error rather than a 500 stack
         raise HTTPException(status_code=500, detail=f"Transcription failed: {exc}")
 
-    metrics, annotations = compute_metrics(transcription, str(audio_path))
-
     # Retake linking: inherit the parent's target so attempts are comparable.
     parent = db.get_session(parent_id) if parent_id else None
     if parent is not None and not coaching_target:
         coaching_target = parent.coaching_target or ""
 
-    target_bands = profiles.target_bands(coaching_target)
-    scores = compute_scores(metrics, transcription.duration_sec, target_bands)
-
     topic = Topic(category=topic_category, prompt=topic_prompt)
-    # Coaching is opt-out via Settings; pass recent history + target/tone/depth.
-    feedback = (
-        coaching.generate_feedback(
-            topic, transcription.text, metrics, scores, db.list_sessions(),
-            target=coaching_target, tone=coaching_tone, depth=coaching_depth,
-            annotations=annotations,
-        )
-        if enable_coaching
-        else None
+    metrics, annotations, scores, feedback, coaching_usage = _score_and_coach(
+        topic, transcription, audio_path,
+        enable_coaching=enable_coaching, coaching_target=coaching_target,
+        coaching_tone=coaching_tone, coaching_depth=coaching_depth,
     )
 
     # Privacy: when "keep recordings" is off, discard the audio after analysis
@@ -154,6 +257,7 @@ async def analyze(
         attempt=(parent.attempt + 1) if parent else 1,
     )
     db.save_session(session)
+    usage_log.log_coaching(session_id, "single", coaching_usage)
     return session
 
 
@@ -176,15 +280,17 @@ def recoach(session_id: str, target: str = "", tone: str = "", depth: str = "") 
     session.scores = compute_scores(
         session.metrics, session.duration_sec, profiles.target_bands(target)
     )
-    feedback = coaching.generate_feedback(
+    feedback, coaching_usage = coaching.generate_feedback(
         session.topic, session.transcript, session.metrics, session.scores,
         db.list_sessions(), target=target, tone=tone, depth=depth,
         annotations=session.annotations,
+        conversation=session.conversation,
     )
     if feedback is not None:
         session.feedback = feedback
     session.coaching_target = target or None
     db.save_session(session)
+    usage_log.log_coaching(session_id, session.exercise or "single", coaching_usage)
     return session
 
 

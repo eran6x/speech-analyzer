@@ -64,6 +64,12 @@ shows an inline before/after diff highlighting whether the coaching's focus area
 improved. (Future: render the ideal delivery in a coaching persona's voice.)
 Design → [Phase8_plan.md](Phase8_plan.md).
 
+**Phase 9 (core landed):** a **conversation drill** in Practice — pick a theme,
+the app asks a short escalating series of questions (generated up front), you
+answer each on the spot ("Finished responding" advances), and the whole exchange
+is analyzed the usual way with a turn-by-turn view. (Future: adaptive follow-ups,
+spoken questions.) → [Phase9_plan.md](Phase9_plan.md).
+
 The scoring config (ideal ranges + weights) lives in one place:
 [backend/app/scoring.py](backend/app/scoring.py) → `CONFIG`.
 

@@ -35,13 +35,18 @@ def _round(x: Optional[float]) -> Optional[float]:
     return None if x is None else round(x, 6)
 
 
-def _style_cost(usage: Optional[dict]) -> Optional[float]:
+def claude_cost(usage: Optional[dict]) -> Optional[float]:
+    """USD cost of a Claude call from its token usage (or None)."""
     if not usage:
         return None
     return _round(
         usage.get("input_tokens", 0) / 1e6 * CLAUDE_IN
         + usage.get("output_tokens", 0) / 1e6 * CLAUDE_OUT
     )
+
+
+# Back-compat alias used by the ideal-delivery usage builder.
+_style_cost = claude_cost
 
 
 def _tts_cost(provider: str, model: Optional[str], chars: int, seconds: float) -> Optional[float]:

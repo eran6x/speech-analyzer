@@ -6,6 +6,7 @@ import Results from "./components/Results.jsx";
 import Trends from "./components/Trends.jsx";
 import Compare from "./components/Compare.jsx";
 import AttemptDiff from "./components/AttemptDiff.jsx";
+import ConversationRunner from "./components/ConversationRunner.jsx";
 import Home from "./components/Home.jsx";
 import Help from "./components/Help.jsx";
 import Settings from "./components/Settings.jsx";
@@ -16,6 +17,7 @@ const TABS = ["Home", "Practice", "Trends", "Compare", "Help", "Settings"];
 
 export default function App() {
   const [view, setView] = useState("Home");
+  const [practiceMode, setPracticeMode] = useState("single"); // single | conversation
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [topic, setTopic] = useState(null);
@@ -128,6 +130,27 @@ export default function App() {
 
       {view === "Practice" && (
         <>
+          <div className="mode-toggle">
+            <button
+              className={practiceMode === "single" ? "tab active" : "tab"}
+              onClick={() => setPracticeMode("single")}
+            >
+              Single prompt
+            </button>
+            <button
+              className={practiceMode === "conversation" ? "tab active" : "tab"}
+              onClick={() => setPracticeMode("conversation")}
+            >
+              Conversation
+            </button>
+          </div>
+
+          {practiceMode === "conversation" && (
+            <ConversationRunner categories={categories} />
+          )}
+
+          {practiceMode === "single" && (
+          <>
           <ScenarioPicker
             categories={categories}
             selected={selectedCategory}
@@ -169,6 +192,8 @@ export default function App() {
                 </button>
               </div>
             </>
+          )}
+          </>
           )}
         </>
       )}

@@ -213,6 +213,18 @@ export default function Results({ session }) {
         </details>
       )}
 
+      {current.conversation?.length > 0 && (
+        <details className="collapsible" open>
+          <summary>Conversation ({current.conversation.length} questions)</summary>
+          {current.conversation.map((t, i) => (
+            <div className="convo-turn" key={i}>
+              <p className="convo-turn-q">{i + 1}. {t.question}</p>
+              <p className="convo-turn-a">{t.answer || "(no answer captured)"}</p>
+            </div>
+          ))}
+        </details>
+      )}
+
       <details className="collapsible" open>
         <summary>Statistics</summary>
         <div className="metric-grid">

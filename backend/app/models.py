@@ -80,6 +80,13 @@ class GenerationUsage(BaseModel):
     estimated: bool = True
 
 
+class Turn(BaseModel):
+    """One question + the user's (transcribed) answer in a conversation drill."""
+
+    question: str
+    answer: str = ""
+
+
 class Session(BaseModel):
     id: str
     timestamp: str
@@ -101,6 +108,10 @@ class Session(BaseModel):
     # Phase 8: retake linking — the attempt this one improves on, and its number.
     parent_id: Optional[str] = None
     attempt: int = 1
+    # Phase 9: conversation drill — exercise type, questions asked, Q/A turns.
+    exercise: Optional[str] = None  # None/"single" | "conversation"
+    questions: Optional[list[str]] = None
+    conversation: Optional[list[Turn]] = None
 
 
 class TranscriptUpdate(BaseModel):

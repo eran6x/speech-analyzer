@@ -6,3 +6,4 @@ __pycache__/
 .dev/
 .venv/
 voice_generations.csv
+coaching_usage.csv

@@ -68,6 +68,46 @@ header h1 {
   margin-top: 1rem;
 }
 
+/* Practice mode toggle + conversation drill */
+.mode-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.convo-progress {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.convo-question {
+  font-size: 1.25rem;
+  line-height: 1.4;
+  margin: 0.5rem 0 1rem;
+}
+
+.conversation .primary-btn {
+  margin-top: 0.75rem;
+}
+
+.convo-turn {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.convo-turn-q {
+  margin: 0 0 0.25rem;
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.convo-turn-a {
+  margin: 0;
+  line-height: 1.5;
+}
+
 .retake-diff {
   border: 1px solid rgba(110, 168, 254, 0.3);
 }

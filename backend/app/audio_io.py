@@ -56,6 +56,19 @@ def to_wav_file(src_path: str, dst_path: str, target_sr: int = TARGET_SR) -> Non
         f.write(to_wav_bytes(src_path, target_sr))
 
 
+def concat_to_wav(src_paths: list[str], dst_path: str, sr: int = TARGET_SR) -> float:
+    """Decode several clips and concatenate them into one mono WAV.
+
+    Used to stitch a conversation's answer clips into a single track for
+    analysis. Returns the combined duration in seconds.
+    """
+    chunks = [load_waveform(p, sr)[0] for p in src_paths]
+    chunks = [c for c in chunks if c.size]
+    combined = np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.float32)
+    write_wav(combined, sr, dst_path)
+    return len(combined) / sr if sr else 0.0
+
+
 def write_wav(samples: np.ndarray, sr: int, dst_path: str) -> None:
     """Write a float32 [-1, 1] mono array as a 16-bit PCM WAV."""
     pcm = (np.clip(samples, -1.0, 1.0) * 32767.0).astype("<i2")
