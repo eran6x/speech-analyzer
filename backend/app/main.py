@@ -84,6 +84,7 @@ async def analyze(
     coaching_target: str = Form(""),
     coaching_tone: str = Form(""),
     coaching_depth: str = Form(""),
+    parent_id: str = Form(""),
 ) -> Session:
     session_id = str(uuid.uuid4())
 
@@ -108,6 +109,12 @@ async def analyze(
         raise HTTPException(status_code=500, detail=f"Transcription failed: {exc}")
 
     metrics, annotations = compute_metrics(transcription, str(audio_path))
+
+    # Retake linking: inherit the parent's target so attempts are comparable.
+    parent = db.get_session(parent_id) if parent_id else None
+    if parent is not None and not coaching_target:
+        coaching_target = parent.coaching_target or ""
+
     target_bands = profiles.target_bands(coaching_target)
     scores = compute_scores(metrics, transcription.duration_sec, target_bands)
 
@@ -143,6 +150,8 @@ async def analyze(
         audio_path=saved_audio_path,
         annotations=annotations,
         coaching_target=coaching_target or None,
+        parent_id=parent.id if parent else None,
+        attempt=(parent.attempt + 1) if parent else 1,
     )
     db.save_session(session)
     return session

@@ -109,6 +109,7 @@ export async function analyze(audioBlob, topic, opts = {}) {
   if (opts.coachingTarget) form.append("coaching_target", opts.coachingTarget);
   if (opts.coachingTone) form.append("coaching_tone", opts.coachingTone);
   if (opts.coachingDepth) form.append("coaching_depth", opts.coachingDepth);
+  if (opts.parentId) form.append("parent_id", opts.parentId);
 
   const res = await fetch(`${API_BASE}/analyze`, {
     method: "POST",

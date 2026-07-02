@@ -58,6 +58,12 @@ Brené Brown, Churchill, Oprah) with **target-relative scoring** and a
 you-vs-them comparison. Re-coach any session against a different target without
 re-recording. Design → [Phase7_plan.md](Phase7_plan.md).
 
+**Phase 8 (core landed):** the **retake loop** — after feedback, "🔁 Try again
+(same topic)" re-records the same prompt (inheriting the coaching target) and
+shows an inline before/after diff highlighting whether the coaching's focus areas
+improved. (Future: render the ideal delivery in a coaching persona's voice.)
+Design → [Phase8_plan.md](Phase8_plan.md).
+
 The scoring config (ideal ranges + weights) lives in one place:
 [backend/app/scoring.py](backend/app/scoring.py) → `CONFIG`.
 

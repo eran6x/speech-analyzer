@@ -5,6 +5,7 @@ import ScenarioPicker from "./components/ScenarioPicker.jsx";
 import Results from "./components/Results.jsx";
 import Trends from "./components/Trends.jsx";
 import Compare from "./components/Compare.jsx";
+import AttemptDiff from "./components/AttemptDiff.jsx";
 import Home from "./components/Home.jsx";
 import Help from "./components/Help.jsx";
 import Settings from "./components/Settings.jsx";
@@ -22,6 +23,8 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [status, setStatus] = useState("idle"); // idle | analyzing | error
   const [error, setError] = useState(null);
+  const [retakeOf, setRetakeOf] = useState(null); // armed retake's parent
+  const [baseline, setBaseline] = useState(null); // prior attempt to diff against
 
   const loadTopic = useCallback(async ({ tailored = false, category = null } = {}) => {
     setTopicLoading(true);
@@ -40,33 +43,43 @@ export default function App() {
     loadTopic();
   }, [loadTopic]);
 
+  function resetAttempts() {
+    setSession(null);
+    setRetakeOf(null);
+    setBaseline(null);
+  }
+
   function pickCategory(category) {
     setSelectedCategory(category);
-    setSession(null);
+    resetAttempts();
     loadTopic({ category });
   }
 
   function pickTailored() {
     setSelectedCategory(null);
-    setSession(null);
+    resetAttempts();
     loadTopic({ tailored: true });
   }
 
   async function handleRecorded(blob) {
+    const parent = retakeOf; // capture: this recording is a retake of `parent`
     setStatus("analyzing");
     setError(null);
     setSession(null);
     try {
       const s = loadSettings();
-      setSession(
-        await analyze(blob, topic, {
-          coaching: s.coachingEnabled,
-          keepRecording: s.keepRecordings,
-          coachingTarget: s.coachingTarget,
-          coachingTone: s.coachingTone,
-          coachingDepth: s.coachingDepth,
-        })
-      );
+      const result = await analyze(blob, topic, {
+        coaching: s.coachingEnabled,
+        keepRecording: s.keepRecordings,
+        // A retake inherits the parent's target so the diff is comparable.
+        coachingTarget: parent ? parent.coaching_target || "" : s.coachingTarget,
+        coachingTone: s.coachingTone,
+        coachingDepth: s.coachingDepth,
+        parentId: parent ? parent.id : undefined,
+      });
+      setBaseline(parent || null);
+      setRetakeOf(null);
+      setSession(result);
       setStatus("idle");
     } catch (err) {
       setError(err.message);
@@ -74,10 +87,17 @@ export default function App() {
     }
   }
 
+  // Same topic + target, links to the current attempt → before/after diff.
+  function startRetake() {
+    setRetakeOf(session);
+    setBaseline(null);
+    setError(null);
+  }
+
   function newTest() {
-    setSession(null);
     setError(null);
     setStatus("idle");
+    resetAttempts();
     loadTopic({ category: selectedCategory });
   }
 
@@ -125,16 +145,29 @@ export default function App() {
             disabled={busy || topicLoading || !topic}
           />
 
+          {retakeOf && !busy && (
+            <p className="status">
+              🔁 Retake of attempt {retakeOf.attempt} — record again to compare.
+            </p>
+          )}
           {topicLoading && <p className="status">Finding a topic…</p>}
           {busy && <p className="status">Analyzing your recording…</p>}
           {error && <p className="error">{error}</p>}
 
           {session && (
             <>
+              {baseline && session.parent_id && (
+                <AttemptDiff base={baseline} retake={session} />
+              )}
               <Results key={session.id} session={session} />
-              <button className="primary-btn newtest" onClick={newTest}>
-                ↻ New test
-              </button>
+              <div className="practice-actions">
+                <button className="ghost-btn" onClick={startRetake}>
+                  🔁 Try again (same topic)
+                </button>
+                <button className="primary-btn" onClick={newTest}>
+                  ↻ New test
+                </button>
+              </div>
             </>
           )}
         </>

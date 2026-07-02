@@ -60,6 +60,43 @@ header h1 {
   margin: 1rem auto 0;
 }
 
+.practice-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.retake-diff {
+  border: 1px solid rgba(110, 168, 254, 0.3);
+}
+
+.retake-verdict {
+  font-size: 0.95rem;
+  margin: 0 0 0.5rem;
+}
+
+.retake-verdict .up {
+  color: #63e6be;
+}
+
+.retake-verdict .down {
+  color: #ff8787;
+}
+
+.focus-badge {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(110, 168, 254, 0.18);
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+  margin-left: 0.35rem;
+  vertical-align: middle;
+}
+
 .trends-latest {
   color: var(--muted);
   margin: 1rem 0 0;

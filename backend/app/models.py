@@ -98,6 +98,9 @@ class Session(BaseModel):
     generation_usage: Optional[GenerationUsage] = None
     # Phase 7: coaching/scoring target (speaker profile or style goal) in effect.
     coaching_target: Optional[str] = None
+    # Phase 8: retake linking — the attempt this one improves on, and its number.
+    parent_id: Optional[str] = None
+    attempt: int = 1
 
 
 class TranscriptUpdate(BaseModel):
