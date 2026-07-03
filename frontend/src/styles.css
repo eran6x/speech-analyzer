@@ -225,6 +225,11 @@ header h1 {
   background: #ff6b6b;
 }
 
+.primary-btn.record {
+  background: #ff4d4d;
+  color: #fff;
+}
+
 .primary-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -798,6 +803,30 @@ header h1 {
   white-space: pre-wrap;
   line-height: 1.55;
   margin: 0;
+}
+
+/* Coaching — formatted sections */
+.coach-section {
+  margin-bottom: 1.1rem;
+}
+
+.coach-section:last-child {
+  margin-bottom: 0;
+}
+
+.coach-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.coach-body {
+  margin: 0;
+  line-height: 1.7;
+  color: var(--text);
 }
 
 .metric {

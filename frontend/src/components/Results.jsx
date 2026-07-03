@@ -9,6 +9,7 @@ import {
   updateTranscript,
 } from "../api.js";
 import { loadSettings } from "../settings.js";
+import Coaching from "./Coaching.jsx";
 import WaveformPlayer from "./WaveformPlayer.jsx";
 
 export default function Results({ session }) {
@@ -152,7 +153,7 @@ export default function Results({ session }) {
         </div>
         {reError && <p className="error">{reError}</p>}
         {feedback ? (
-          <p className="feedback-text">{feedback}</p>
+          <Coaching text={feedback} />
         ) : (
           <p className="settings-hint">No coaching (set ANTHROPIC_API_KEY or enable it in Settings).</p>
         )}
@@ -225,7 +226,7 @@ export default function Results({ session }) {
         </details>
       )}
 
-      <details className="collapsible" open>
+      <details className="collapsible">
         <summary>Statistics</summary>
         <div className="metric-grid">
           <Metric label="Words / min" value={metrics.wpm} />

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchSessions } from "../api.js";
 import ScoreMetricDiff from "./ScoreMetricDiff.jsx";
+import Coaching from "./Coaching.jsx";
 
 export default function Compare() {
   const [sessions, setSessions] = useState(null);
@@ -52,8 +53,14 @@ export default function Compare() {
         <TextCol title="B — transcript" body={B.transcript} />
       </div>
       <div className="cmp-cols">
-        <TextCol title="A — coaching" body={A.feedback} />
-        <TextCol title="B — coaching" body={B.feedback} />
+        <div className="cmp-col">
+          <h4>A — coaching</h4>
+          <Coaching text={A.feedback} />
+        </div>
+        <div className="cmp-col">
+          <h4>B — coaching</h4>
+          <Coaching text={B.feedback} />
+        </div>
       </div>
     </div>
   );

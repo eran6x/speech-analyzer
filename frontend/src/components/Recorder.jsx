@@ -80,7 +80,7 @@ export default function Recorder({ onRecorded, disabled }) {
       </div>
 
       {!recording ? (
-        <button onClick={start} disabled={disabled} className="primary-btn">
+        <button onClick={start} disabled={disabled} className="primary-btn record">
           ● Record
         </button>
       ) : (

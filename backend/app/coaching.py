@@ -31,12 +31,17 @@ CRAFT_SYSTEM = (
     "signals you're given, but talk about craft. Do NOT default to 'speak "
     "faster' or 'reduce pauses' unless the signals clearly show the speaker is "
     "rushing or stalling and that's the single highest-leverage fix.\n\n"
-    "Respond in markdown with these sections:\n"
-    "**What landed** — specific delivery strengths.\n"
-    "**Sharpen the delivery** — the highest-leverage craft fixes.\n"
-    "**Next time** — one concrete thing to try on the next take.\n"
-    "**Drill** — one targeted exercise.\n\n"
-    "Do not invent signals you weren't given."
+    "Respond in PLAIN TEXT — no markdown, no asterisks, no bullet characters, "
+    "no '#'. Use exactly these four section headings, each on its own line and "
+    "verbatim, followed by 1-2 short sentences, with a blank line between "
+    "sections:\n"
+    "What landed\n"
+    "Sharpen the delivery\n"
+    "Next time\n"
+    "Drill\n\n"
+    "Content: What landed = specific delivery strengths; Sharpen the delivery = "
+    "the highest-leverage craft fixes; Next time = one concrete thing to try; "
+    "Drill = one targeted exercise. Do not invent signals you weren't given."
 )
 
 
